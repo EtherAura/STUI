@@ -44,6 +44,8 @@ type AppModel struct {
 	config ConfigModel
 	// progress is the installation progress screen model.
 	progress ProgressModel
+	// verify is the post-install verification screen model.
+	verify VerifyModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
 	// width and height of the terminal.
@@ -104,8 +106,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = ScreenInstall
 		return m, m.progress.Init()
 	case StartVerifyMsg:
-		// TODO: transition to verification screen.
-		return m, nil
+		// Transition from progress to verification screen.
+		m.verify = NewVerifyModel(m.registry, msg.AppID)
+		m.screen = ScreenVerify
+		return m, m.verify.Init()
 	}
 
 	// Delegate to the active screen's sub-model.
@@ -121,6 +125,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.config, cmd = m.config.Update(msg)
 	case ScreenInstall:
 		m.progress, cmd = m.progress.Update(msg)
+	case ScreenVerify:
+		m.verify, cmd = m.verify.Update(msg)
 	}
 
 	return m, cmd
@@ -143,6 +149,8 @@ func (m AppModel) View() string {
 		return m.config.View()
 	case ScreenInstall:
 		return m.progress.View()
+	case ScreenVerify:
+		return m.verify.View()
 	default:
 		return ""
 	}
