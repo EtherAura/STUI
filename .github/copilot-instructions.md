@@ -106,6 +106,21 @@ Every Go source file **must** have thorough, consistent comments. This is non-ne
 - Never leave an exported symbol uncommented — `golangci-lint` with `revive` enforces this.
 - When adding new code, **always** add comments in the same commit — never defer them.
 
+## Post-Change Workflow (MANDATORY)
+
+After **every** completed todo item, task, or logical unit of change, you **must** run all of the following steps in order before moving on:
+
+1. **Build** — `go build ./...` — Confirm the application compiles cleanly. Fix any errors before proceeding.
+2. **Lint** — `golangci-lint run ./...` — Zero issues required. Fix all warnings and errors inline.
+3. **Test** — `go test ./... -count=1` — All tests must pass. If a test fails, fix it immediately.
+4. **BEADS** — Meticulously maintain issue tracking after each change:
+   - `bd update <id> --status in_progress` when starting work on an issue.
+   - `bd close <id> --reason "..."` immediately when work is done.
+   - `bd create "Title" --description="..." -t <type> -p <priority>` for any new issues, bugs, or follow-up work discovered during implementation.
+   - `bd sync` at the end of each session to persist state.
+
+**Do not skip or defer these steps.** Every change must leave the project in a green (compiling, linted, tested) state with BEADS accurately reflecting the current status of all work.
+
 ## Issue Tracking
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` for workflow context.
