@@ -2,26 +2,40 @@
 package tui
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+
+	"github.com/EtherAura/stui/internal/installer"
 )
 
-// Styles used across the TUI.
-var (
-	// BannerStyle renders the application title in bold purple.
-	BannerStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4"))
+// Screen identifies which TUI screen is currently active.
+type Screen int
 
-	// HelpStyle renders help text in muted gray.
-	HelpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262"))
+// Screen constants enumerate all screens in the application flow.
+const (
+	// ScreenMenu is the main application selection menu.
+	ScreenMenu Screen = iota
+	// ScreenDetail shows app details and a confirm/back prompt.
+	ScreenDetail
+	// ScreenPreflight runs and displays preflight checks.
+	ScreenPreflight
+	// ScreenConfig is the interactive configuration wizard.
+	ScreenConfig
+	// ScreenInstall shows real-time installation progress.
+	ScreenInstall
+	// ScreenVerify displays post-install verification results.
+	ScreenVerify
 )
 
 // AppModel is the root model for the STUI application.
+// It owns the installer registry, tracks the active screen,
+// and delegates to the appropriate sub-model.
 type AppModel struct {
+	// registry holds the available installer constructors.
+	registry installer.Registry
+	// screen is the currently active screen.
+	screen Screen
+	// menu is the main application selection menu model.
+	menu MenuModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
 	// width and height of the terminal.
@@ -29,42 +43,60 @@ type AppModel struct {
 	height int
 }
 
-// NewAppModel creates a new root application model.
+// NewAppModel creates a new root application model with the
+// default installer registry and menu pre-loaded.
 func NewAppModel() AppModel {
-	return AppModel{}
+	reg := installer.NewRegistry()
+	return AppModel{
+		registry: reg,
+		screen:   ScreenMenu,
+		menu:     NewMenuModel(reg),
+	}
 }
 
-// Init implements tea.Model.
+// Init implements tea.Model. Initializes the active sub-model.
 func (m AppModel) Init() tea.Cmd {
-	return nil
+	return m.menu.Init()
 }
 
-// Update implements tea.Model.
+// Update implements tea.Model. Dispatches messages to the active
+// screen's sub-model and handles global keys.
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
+		if msg.String() == "ctrl+c" {
 			m.quitting = true
 			return m, tea.Quit
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case AppSelectedMsg:
+		// TODO: transition to detail screen
+		return m, nil
 	}
-	return m, nil
+
+	// Delegate to the active screen's sub-model.
+	var cmd tea.Cmd
+	if m.screen == ScreenMenu {
+		m.menu, cmd = m.menu.Update(msg)
+	}
+
+	return m, cmd
 }
 
-// View implements tea.Model.
+// View implements tea.Model. Renders the active screen.
 func (m AppModel) View() string {
 	if m.quitting {
 		return "Goodbye!\n"
 	}
 
-	banner := BannerStyle.Render("STUI - Sonar Terminal User Interface")
-	help := HelpStyle.Render("Press q to quit.")
-
-	return fmt.Sprintf("\n  %s\n\n  %s\n\n", banner, help)
+	switch m.screen {
+	case ScreenMenu:
+		return m.menu.View()
+	default:
+		return ""
+	}
 }
 
 // Quitting returns whether the model is in a quitting state.
@@ -80,4 +112,9 @@ func (m AppModel) Width() int {
 // Height returns the current terminal height.
 func (m AppModel) Height() int {
 	return m.height
+}
+
+// Screen returns the currently active screen.
+func (m AppModel) Screen() Screen {
+	return m.screen
 }

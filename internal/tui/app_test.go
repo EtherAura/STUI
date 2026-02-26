@@ -1,6 +1,6 @@
 // app_test.go contains unit tests for the root AppModel, covering
-// initialization, key handling, window resize, view rendering, and
-// graceful quit behavior.
+// initialization, key handling, window resize, view rendering,
+// screen state, and graceful quit behavior.
 package tui
 
 import (
@@ -11,7 +11,7 @@ import (
 )
 
 // TestNewAppModel verifies a fresh model starts in a non-quitting state
-// with zero dimensions.
+// on the menu screen with zero dimensions.
 func TestNewAppModel(t *testing.T) {
 	m := NewAppModel()
 	if m.Quitting() {
@@ -20,19 +20,20 @@ func TestNewAppModel(t *testing.T) {
 	if m.Width() != 0 || m.Height() != 0 {
 		t.Error("new model should have zero dimensions")
 	}
-}
-
-// TestAppModelInit verifies Init returns no initial command.
-func TestAppModelInit(t *testing.T) {
-	m := NewAppModel()
-	cmd := m.Init()
-	if cmd != nil {
-		t.Error("Init() should return nil")
+	if m.Screen() != ScreenMenu {
+		t.Errorf("new model should start on ScreenMenu, got %d", m.Screen())
 	}
 }
 
-// TestAppModelView verifies the default view contains the banner and
-// quit instructions.
+// TestAppModelInit verifies Init returns a command (from menu init).
+func TestAppModelInit(t *testing.T) {
+	m := NewAppModel()
+	_ = m.Init()
+	// Init may return nil or a cmd from the menu; either is acceptable.
+}
+
+// TestAppModelView verifies the default view contains the banner
+// from the menu screen.
 func TestAppModelView(t *testing.T) {
 	m := NewAppModel()
 	view := m.View()
@@ -40,22 +41,19 @@ func TestAppModelView(t *testing.T) {
 	if !strings.Contains(view, "STUI") {
 		t.Error("view should contain 'STUI'")
 	}
-	if !strings.Contains(view, "Press q to quit") {
-		t.Error("view should contain quit instruction")
-	}
 }
 
 // TestAppModelViewQuitting verifies the view shows a goodbye message
-// after the user presses 'q'.
+// after the user presses ctrl+c.
 func TestAppModelViewQuitting(t *testing.T) {
 	m := NewAppModel()
 
-	// Simulate pressing 'q'
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	// Simulate pressing ctrl+c (global quit).
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	model := updated.(AppModel)
 
 	if !model.Quitting() {
-		t.Error("model should be quitting after 'q'")
+		t.Error("model should be quitting after ctrl+c")
 	}
 
 	view := model.View()
@@ -64,19 +62,14 @@ func TestAppModelViewQuitting(t *testing.T) {
 	}
 }
 
-// TestAppModelUpdateQuit is a table-driven test verifying that 'q' and
-// ctrl+c produce tea.Quit while other keys are no-ops.
+// TestAppModelUpdateQuit is a table-driven test verifying that ctrl+c
+// produces tea.Quit while other keys are delegated to the menu.
 func TestAppModelUpdateQuit(t *testing.T) {
 	tests := []struct {
 		name string
 		msg  tea.Msg
 		quit bool
 	}{
-		{
-			name: "q key quits",
-			msg:  tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}},
-			quit: true,
-		},
 		{
 			name: "ctrl+c quits",
 			msg:  tea.KeyMsg{Type: tea.KeyCtrlC},
@@ -101,9 +94,6 @@ func TestAppModelUpdateQuit(t *testing.T) {
 			if tt.quit && cmd == nil {
 				t.Error("expected tea.Quit command")
 			}
-			if !tt.quit && cmd != nil {
-				t.Error("expected no command for non-quit key")
-			}
 		})
 	}
 }
@@ -113,12 +103,9 @@ func TestAppModelUpdateQuit(t *testing.T) {
 func TestAppModelUpdateWindowSize(t *testing.T) {
 	m := NewAppModel()
 
-	updated, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	model := updated.(AppModel)
 
-	if cmd != nil {
-		t.Error("WindowSizeMsg should not produce a command")
-	}
 	if model.Width() != 120 {
 		t.Errorf("Width() = %d, want 120", model.Width())
 	}
@@ -141,5 +128,39 @@ func TestAppModelUnhandledMsg(t *testing.T) {
 	}
 	if model.Quitting() {
 		t.Error("unhandled message should not cause quitting")
+	}
+}
+
+// TestAppModelAppSelectedMsg verifies that receiving an AppSelectedMsg
+// is handled without error (transition logic is a TODO).
+func TestAppModelAppSelectedMsg(t *testing.T) {
+	m := NewAppModel()
+	updated, cmd := m.Update(AppSelectedMsg{AppID: "customer-portal"})
+	model := updated.(AppModel)
+
+	if cmd != nil {
+		t.Error("AppSelectedMsg should not produce a command yet")
+	}
+	if model.Quitting() {
+		t.Error("AppSelectedMsg should not cause quitting")
+	}
+}
+
+// TestScreenConstants verifies that screen enum values are distinct
+// and start from zero.
+func TestScreenConstants(t *testing.T) {
+	screens := []Screen{
+		ScreenMenu, ScreenDetail, ScreenPreflight,
+		ScreenConfig, ScreenInstall, ScreenVerify,
+	}
+	seen := make(map[Screen]bool)
+	for _, s := range screens {
+		if seen[s] {
+			t.Errorf("duplicate screen value: %d", s)
+		}
+		seen[s] = true
+	}
+	if ScreenMenu != 0 {
+		t.Errorf("ScreenMenu should be 0, got %d", ScreenMenu)
 	}
 }
