@@ -2,6 +2,7 @@
 
 ## Contents
 
+- [Usage](usage.md) — Installing, running, and navigating STUI
 - [Architecture](architecture.md) — Project structure and design decisions
 - [Dependencies](dependencies.md) — Every dependency explained in detail
 - [Installers](installers.md) — How each Sonar app installer works
