@@ -73,6 +73,39 @@ stui/
 - Keep TUI models focused — one model per screen/view
 - Test installer logic independently from TUI rendering
 
+## Comment Standards (MANDATORY)
+
+Every Go source file **must** have thorough, consistent comments. This is non-negotiable.
+
+### File-Level Comments
+- Every `.go` file starts with a comment block describing the file's purpose.
+- For files that define a package's primary entry point, use the `// Package <name> ...` godoc form.
+- For other files in the same package, use `// <filename> implements/contains ...` followed by context (e.g., upstream repo links for installer files).
+
+### Function & Method Comments
+- **Every** exported function/method must have a `// FuncName ...` godoc comment.
+- **Every** unexported function/method must also have a `//` comment explaining its purpose.
+- Comments should describe *what* the function does and *why*, not just restate the name.
+
+### Type & Struct Comments
+- Every exported type gets a `// TypeName ...` godoc comment.
+- Every struct field gets an inline `//` comment describing its purpose and any constraints (e.g., which app it applies to).
+
+### Constants & Variables
+- Every `const` and exported `var` block gets a group comment.
+- Individual constants/variables within a block each get their own `//` comment.
+
+### Test File Comments
+- Test files get a `// <filename> contains ...` header summarizing what's tested.
+- Every `Test*` function gets a `//` comment describing the scenario(s) it covers.
+- Test helpers get `//` comments explaining their role.
+
+### Style Rules
+- Use concise, imperative voice: `// Validate checks that ...` not `// This method is used to validate ...`
+- Keep comments to 1–2 lines for simple functions; use a short paragraph for complex ones.
+- Never leave an exported symbol uncommented — `golangci-lint` with `revive` enforces this.
+- When adding new code, **always** add comments in the same commit — never defer them.
+
 ## Issue Tracking
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` for workflow context.
