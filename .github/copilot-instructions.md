@@ -119,7 +119,7 @@ Only after the issue exists and is marked in-progress should you begin implement
 
 After **every** completed todo item, task, or logical unit of change, you **must** run all of the following steps in order before moving on:
 
-1. **Build** — `go build ./...` — Confirm the application compiles cleanly. Fix any errors before proceeding.
+1. **Build** — `go build -o stui ./cmd/stui` — Produce the `./stui` binary so the user can immediately run it. Fix any errors before proceeding.
 2. **Lint** — `golangci-lint run ./...` — Zero issues required. Fix all warnings and errors inline.
 3. **Test** — `go test ./... -count=1` — All tests must pass. If a test fails, fix it immediately.
 4. **BEADS** — Meticulously maintain issue tracking after each change:
