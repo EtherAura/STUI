@@ -28,8 +28,21 @@ func (n *NetflowInstaller) Description() string { return "Netflow on-premise pro
 func (n *NetflowInstaller) Requirements() []string {
 	return []string{
 		"OS: Ubuntu or Debian (recommended)",
-		"Commands: git, make, unzip",
+		"Commands: git, make, unzip, docker",
 		"Privileges: root / sudo",
+		"CPU: 2+ cores",
+		"RAM: 4 GB+",
+		"Disk: 50 GB+ free",
+	}
+}
+
+// HardwareRequirements returns the Sonar-recommended minimums for
+// Netflow On-Prem: 2 cores, 4 GB RAM, 50 GB disk for flow storage.
+func (n *NetflowInstaller) HardwareRequirements() HardwareReqs {
+	return HardwareReqs{
+		MinCPUCores: 2,
+		MinRAMMB:    4096,
+		MinDiskGB:   50,
 	}
 }
 
@@ -52,11 +65,21 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 	}
 
 	// Check required commands.
-	for _, cmd := range []string{"git", "make", "unzip"} {
+	for _, cmd := range []string{"git", "make", "unzip", "docker"} {
 		if !CommandExists(cmd) {
 			result.Passed = false
 			result.Errors = append(result.Errors, fmt.Sprintf("required command not found: %s", cmd))
 		}
+	}
+
+	// Check hardware against Sonar recommendations.
+	hw, hwErr := DetectHardware()
+	if hwErr == nil {
+		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
+			MinCPUCores: 2,
+			MinRAMMB:    4096,
+			MinDiskGB:   50,
+		})...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.

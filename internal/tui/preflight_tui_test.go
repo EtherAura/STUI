@@ -113,9 +113,9 @@ func TestPreflightViewRunning(t *testing.T) {
 	}
 }
 
-// TestPreflightViewRequirements verifies the requirements section is
-// displayed for the selected application.
-func TestPreflightViewRequirements(t *testing.T) {
+// TestPreflightViewNoRequirements verifies that requirements are
+// not shown on the preflight screen (they moved to the detail screen).
+func TestPreflightViewNoRequirements(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewPreflightModel(reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
@@ -125,14 +125,8 @@ func TestPreflightViewRequirements(t *testing.T) {
 	}})
 	view := m.View()
 
-	if !strings.Contains(view, "Requirements") {
-		t.Error("view should contain Requirements heading")
-	}
-	if !strings.Contains(view, "Ubuntu") {
-		t.Error("view should list OS requirement")
-	}
-	if !strings.Contains(view, "git") {
-		t.Error("view should list required commands")
+	if strings.Contains(view, "Requirements") {
+		t.Error("preflight view should not contain Requirements heading (moved to detail)")
 	}
 }
 

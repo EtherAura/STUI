@@ -30,8 +30,21 @@ func (p *PortalInstaller) Description() string {
 func (p *PortalInstaller) Requirements() []string {
 	return []string{
 		"OS: Ubuntu (recommended)",
-		"Commands: git, curl",
+		"Commands: git, curl, docker",
 		"Privileges: root / sudo",
+		"CPU: 2+ cores",
+		"RAM: 2 GB+",
+		"Disk: 10 GB+ free",
+	}
+}
+
+// HardwareRequirements returns the Sonar-recommended minimums for
+// the Customer Portal: 2 cores, 2 GB RAM, 10 GB disk.
+func (p *PortalInstaller) HardwareRequirements() HardwareReqs {
+	return HardwareReqs{
+		MinCPUCores: 2,
+		MinRAMMB:    2048,
+		MinDiskGB:   10,
 	}
 }
 
@@ -54,11 +67,21 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	}
 
 	// Check required commands.
-	for _, cmd := range []string{"git", "curl"} {
+	for _, cmd := range []string{"git", "curl", "docker"} {
 		if !CommandExists(cmd) {
 			result.Passed = false
 			result.Errors = append(result.Errors, fmt.Sprintf("required command not found: %s", cmd))
 		}
+	}
+
+	// Check hardware against Sonar recommendations.
+	hw, hwErr := DetectHardware()
+	if hwErr == nil {
+		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
+			MinCPUCores: 2,
+			MinRAMMB:    2048,
+			MinDiskGB:   10,
+		})...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.

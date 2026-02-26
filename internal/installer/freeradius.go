@@ -32,6 +32,19 @@ func (f *FreeRADIUSInstaller) Requirements() []string {
 		"OS: Ubuntu (recommended)",
 		"Commands: git",
 		"Privileges: root / sudo",
+		"CPU: 1+ core",
+		"RAM: 1 GB+",
+		"Disk: 10 GB+ free",
+	}
+}
+
+// HardwareRequirements returns the Sonar-recommended minimums for
+// FreeRADIUS Genie: 1 core, 1 GB RAM, 10 GB disk.
+func (f *FreeRADIUSInstaller) HardwareRequirements() HardwareReqs {
+	return HardwareReqs{
+		MinCPUCores: 1,
+		MinRAMMB:    1024,
+		MinDiskGB:   10,
 	}
 }
 
@@ -57,6 +70,16 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 	if !CommandExists("git") {
 		result.Passed = false
 		result.Errors = append(result.Errors, "required command not found: git")
+	}
+
+	// Check hardware against Sonar recommendations.
+	hw, hwErr := DetectHardware()
+	if hwErr == nil {
+		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
+			MinCPUCores: 1,
+			MinRAMMB:    1024,
+			MinDiskGB:   10,
+		})...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.

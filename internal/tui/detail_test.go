@@ -51,7 +51,7 @@ func TestDetailModelInit(t *testing.T) {
 }
 
 // TestDetailModelViewContent verifies the view shows the app name,
-// description, and install steps.
+// description, requirements, and install steps.
 func TestDetailModelViewContent(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewDetailModel(reg, installer.AppCustomerPortal)
@@ -59,6 +59,12 @@ func TestDetailModelViewContent(t *testing.T) {
 
 	if !strings.Contains(view, "Customer Portal") {
 		t.Error("view should contain app name")
+	}
+	if !strings.Contains(view, "Requirements") {
+		t.Error("view should contain Requirements heading")
+	}
+	if !strings.Contains(view, "docker") {
+		t.Error("view should list docker as requirement for portal")
 	}
 	if !strings.Contains(view, "Install prerequisites") {
 		t.Error("view should contain first step name")

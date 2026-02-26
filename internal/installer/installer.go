@@ -99,6 +99,10 @@ type Installer interface {
 	// (e.g., supported OS, required commands, root access).
 	Requirements() []string
 
+	// HardwareRequirements returns the minimum recommended hardware
+	// specifications for the application.
+	HardwareRequirements() HardwareReqs
+
 	// PreflightCheck verifies the system meets requirements.
 	PreflightCheck(ctx context.Context) (*PreflightResult, error)
 

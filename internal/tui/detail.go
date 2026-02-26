@@ -92,6 +92,15 @@ func (m DetailModel) View() string {
 	b.WriteString(BodyStyle.Render(m.installer.Description()))
 	b.WriteString("\n\n")
 
+	// Requirements section.
+	b.WriteString(BannerStyle.Render("Requirements"))
+	b.WriteString("\n")
+	for _, req := range m.installer.Requirements() {
+		b.WriteString(DimStyle.Render("  • " + req))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+
 	// Installation steps section.
 	steps := m.installer.Steps()
 	b.WriteString(BannerStyle.Render("Installation Steps"))

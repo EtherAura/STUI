@@ -29,6 +29,19 @@ func (p *PollerInstaller) Requirements() []string {
 	return []string{
 		"OS: Ubuntu (recommended)",
 		"Privileges: root / sudo",
+		"CPU: 2+ cores",
+		"RAM: 2 GB+",
+		"Disk: 20 GB+ free",
+	}
+}
+
+// HardwareRequirements returns the Sonar-recommended minimums for
+// the Poller: 2 cores, 2 GB RAM, 20 GB disk.
+func (p *PollerInstaller) HardwareRequirements() HardwareReqs {
+	return HardwareReqs{
+		MinCPUCores: 2,
+		MinRAMMB:    2048,
+		MinDiskGB:   20,
 	}
 }
 
@@ -48,6 +61,16 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	if osInfo.ID != "ubuntu" {
 		result.Warnings = append(result.Warnings,
 			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
+	}
+
+	// Check hardware against Sonar recommendations.
+	hw, hwErr := DetectHardware()
+	if hwErr == nil {
+		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
+			MinCPUCores: 2,
+			MinRAMMB:    2048,
+			MinDiskGB:   20,
+		})...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.

@@ -176,17 +176,6 @@ func (m PreflightModel) View() string {
 
 	// Display results.
 	if m.result != nil {
-		// App name and requirements section.
-		if m.inst != nil {
-			b.WriteString(BannerStyle.Render(m.inst.Name() + " Requirements"))
-			b.WriteString("\n")
-			for _, req := range m.inst.Requirements() {
-				b.WriteString(DimStyle.Render("  • " + req))
-				b.WriteString("\n")
-			}
-			b.WriteString("\n")
-		}
-
 		// OS info.
 		b.WriteString(BodyStyle.Render(fmt.Sprintf("OS: %s %s", m.result.OS, m.result.Version)))
 		b.WriteString("\n\n")
