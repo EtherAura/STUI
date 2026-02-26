@@ -170,7 +170,7 @@ func TestPreflightViewPassed(t *testing.T) {
 	view := m.View()
 
 	if !strings.Contains(view, "All checks passed") {
-		t.Error("passed view should contain success message")
+		t.Error("passed view should contain 'All checks passed' when no warnings")
 	}
 	if !strings.Contains(view, "ubuntu") {
 		t.Error("passed view should show OS")
@@ -213,6 +213,12 @@ func TestPreflightViewWarnings(t *testing.T) {
 
 	if !strings.Contains(view, "not running as root") {
 		t.Error("view should show warning text")
+	}
+	if !strings.Contains(view, "Checks passed with warnings") {
+		t.Error("view should say 'Checks passed with warnings' when warnings exist")
+	}
+	if strings.Contains(view, "All checks passed") {
+		t.Error("view should not say 'All checks passed' when warnings exist")
 	}
 }
 

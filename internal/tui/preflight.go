@@ -215,7 +215,11 @@ func (m PreflightModel) View() string {
 
 		// Overall status.
 		if m.result.Passed {
-			b.WriteString(SuccessStyle.Render("  ✓  All checks passed"))
+			if len(m.result.Warnings) > 0 {
+				b.WriteString(WarningStyle.Render("  ✓  Checks passed with warnings"))
+			} else {
+				b.WriteString(SuccessStyle.Render("  ✓  All checks passed"))
+			}
 			b.WriteString("\n\n")
 			b.WriteString(SuccessStyle.Render("Press enter to continue"))
 			b.WriteString("\n")
