@@ -1,0 +1,35 @@
+# Binaries
+stui
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build output
+dist/
+build/
+
+# Go
+vendor/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+*.pem
+*.key
+
+# Dolt (beads backend)
+.dolt/
+
+# Test output
+coverage.out
+*.test
