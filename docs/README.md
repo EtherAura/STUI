@@ -1,5 +1,9 @@
 # STUI Documentation
 
+STUI is an **unofficial, community-built** tool that simplifies the installation of applications published by [Sonar Software Inc.](https://sonar.software) It is **not** affiliated with, endorsed by, or supported by SonarSoftwareInc. For issues with the Sonar applications themselves, refer to the respective [SonarSoftwareInc repositories](https://github.com/orgs/SonarSoftwareInc/repositories).
+
+For bugs, feature requests, or questions about **STUI itself**, please [open an issue](https://github.com/EtherAura/stui/issues) on this repository.
+
 ## Contents
 
 - [Usage](usage.md) — Installing, running, and navigating STUI
