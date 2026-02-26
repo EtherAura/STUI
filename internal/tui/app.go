@@ -42,6 +42,8 @@ type AppModel struct {
 	preflight PreflightModel
 	// config is the configuration wizard screen model.
 	config ConfigModel
+	// progress is the installation progress screen model.
+	progress ProgressModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
 	// width and height of the terminal.
@@ -97,7 +99,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = ScreenConfig
 		return m, m.config.Init()
 	case ConfigDoneMsg:
-		// TODO: transition to install progress screen.
+		// Transition from config wizard to install progress.
+		m.progress = NewProgressModel(m.registry, msg.AppID, msg.Config)
+		m.screen = ScreenInstall
+		return m, m.progress.Init()
+	case StartVerifyMsg:
+		// TODO: transition to verification screen.
 		return m, nil
 	}
 
@@ -112,6 +119,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.preflight, cmd = m.preflight.Update(msg)
 	case ScreenConfig:
 		m.config, cmd = m.config.Update(msg)
+	case ScreenInstall:
+		m.progress, cmd = m.progress.Update(msg)
 	}
 
 	return m, cmd
@@ -132,6 +141,8 @@ func (m AppModel) View() string {
 		return m.preflight.View()
 	case ScreenConfig:
 		return m.config.View()
+	case ScreenInstall:
+		return m.progress.View()
 	default:
 		return ""
 	}
