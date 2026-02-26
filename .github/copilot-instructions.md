@@ -106,6 +106,15 @@ Every Go source file **must** have thorough, consistent comments. This is non-ne
 - Never leave an exported symbol uncommented — `golangci-lint` with `revive` enforces this.
 - When adding new code, **always** add comments in the same commit — never defer them.
 
+## Pre-Work Workflow (MANDATORY)
+
+Before starting **any** implementation work on a user request, you **must**:
+
+1. **Create a BEADS issue** — `bd create "Title" --description="..." -t <type> -p <priority>` to track the request.
+2. **Claim the issue** — `bd update <id> --status in_progress` to mark it as actively being worked on.
+
+Only after the issue exists and is marked in-progress should you begin implementation. This ensures every request is tracked and nothing is lost.
+
 ## Post-Change Workflow (MANDATORY)
 
 After **every** completed todo item, task, or logical unit of change, you **must** run all of the following steps in order before moving on:
