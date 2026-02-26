@@ -36,6 +36,8 @@ type AppModel struct {
 	screen Screen
 	// menu is the main application selection menu model.
 	menu MenuModel
+	// detail is the app detail/confirm screen model.
+	detail DetailModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
 	// width and height of the terminal.
@@ -60,7 +62,7 @@ func (m AppModel) Init() tea.Cmd {
 }
 
 // Update implements tea.Model. Dispatches messages to the active
-// screen's sub-model and handles global keys.
+// screen's sub-model and handles global keys and screen transitions.
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -72,14 +74,26 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case AppSelectedMsg:
-		// TODO: transition to detail screen
+		// Transition from menu to detail screen.
+		m.detail = NewDetailModel(m.registry, msg.AppID)
+		m.screen = ScreenDetail
+		return m, nil
+	case BackToMenuMsg:
+		// Return to the main menu.
+		m.screen = ScreenMenu
+		return m, nil
+	case StartPreflightMsg:
+		// TODO: transition to preflight screen.
 		return m, nil
 	}
 
 	// Delegate to the active screen's sub-model.
 	var cmd tea.Cmd
-	if m.screen == ScreenMenu {
+	switch m.screen {
+	case ScreenMenu:
 		m.menu, cmd = m.menu.Update(msg)
+	case ScreenDetail:
+		m.detail, cmd = m.detail.Update(msg)
 	}
 
 	return m, cmd
@@ -94,6 +108,8 @@ func (m AppModel) View() string {
 	switch m.screen {
 	case ScreenMenu:
 		return m.menu.View()
+	case ScreenDetail:
+		return m.detail.View()
 	default:
 		return ""
 	}
