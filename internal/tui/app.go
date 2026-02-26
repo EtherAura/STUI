@@ -40,6 +40,8 @@ type AppModel struct {
 	detail DetailModel
 	// preflight is the preflight check screen model.
 	preflight PreflightModel
+	// config is the configuration wizard screen model.
+	config ConfigModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
 	// width and height of the terminal.
@@ -90,7 +92,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = ScreenPreflight
 		return m, m.preflight.Init()
 	case StartConfigMsg:
-		// TODO: transition to config wizard screen.
+		// Transition from preflight to config wizard.
+		m.config = NewConfigModel(msg.AppID)
+		m.screen = ScreenConfig
+		return m, m.config.Init()
+	case ConfigDoneMsg:
+		// TODO: transition to install progress screen.
 		return m, nil
 	}
 
@@ -103,6 +110,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.detail, cmd = m.detail.Update(msg)
 	case ScreenPreflight:
 		m.preflight, cmd = m.preflight.Update(msg)
+	case ScreenConfig:
+		m.config, cmd = m.config.Update(msg)
 	}
 
 	return m, cmd
@@ -121,6 +130,8 @@ func (m AppModel) View() string {
 		return m.detail.View()
 	case ScreenPreflight:
 		return m.preflight.View()
+	case ScreenConfig:
+		return m.config.View()
 	default:
 		return ""
 	}
