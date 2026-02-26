@@ -79,6 +79,9 @@ type PreflightResult struct {
 	Errors []string
 	// Warnings lists non-blocking issues the user should know about.
 	Warnings []string
+	// NeedsRoot is true when the process is not running as root and
+	// the installer requires elevated privileges.
+	NeedsRoot bool
 }
 
 // Installer is the interface that all Sonar application installers implement.

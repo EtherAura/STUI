@@ -2,7 +2,8 @@
 // After the user confirms an app on the detail screen, this screen
 // runs the installer's PreflightCheck asynchronously, shows progress
 // with a spinner, and displays pass/fail results. On all-pass, the
-// user can proceed; on failure, blockers are shown.
+// user can proceed; on failure, blockers are shown. If the process
+// is not running as root, the user is offered a sudo relaunch.
 package tui
 
 import (
@@ -29,6 +30,10 @@ type StartConfigMsg struct {
 	// AppID is the registry key of the selected application.
 	AppID string
 }
+
+// SudoRelaunchMsg signals that the application should quit and
+// relaunch itself with sudo for elevated privileges.
+type SudoRelaunchMsg struct{}
 
 // PreflightModel runs and displays preflight check results for a
 // selected application installer.
@@ -95,7 +100,7 @@ func (m PreflightModel) runPreflight() tea.Cmd {
 }
 
 // Update implements tea.Model. Handles spinner ticks, preflight
-// completion, and navigation keys.
+// completion, and navigation keys including sudo relaunch.
 func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case PreflightDoneMsg:
@@ -111,6 +116,13 @@ func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 				if m.result != nil && m.result.Passed {
 					return m, func() tea.Msg {
 						return StartConfigMsg{AppID: m.appID}
+					}
+				}
+			case "s":
+				// Offer sudo relaunch when not running as root.
+				if m.result != nil && m.result.NeedsRoot {
+					return m, func() tea.Msg {
+						return SudoRelaunchMsg{}
 					}
 				}
 			case "esc", "backspace":
@@ -191,6 +203,12 @@ func (m PreflightModel) View() string {
 		} else {
 			b.WriteString(ErrorStyle.Render("✗ Preflight checks failed"))
 			b.WriteString("\n\n")
+		}
+
+		// Sudo relaunch option when not running as root.
+		if m.result.NeedsRoot {
+			b.WriteString(WarningStyle.Render("Press s to restart with sudo"))
+			b.WriteString("\n")
 		}
 
 		b.WriteString(HelpStyle.Render("Press esc to go back"))

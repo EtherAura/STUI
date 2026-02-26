@@ -36,11 +36,13 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 	result.OS = osInfo.ID
 	result.Version = osInfo.VersionID
 
+	// Check supported OS — warn but do not block on non-Ubuntu/Debian.
 	if osInfo.ID != "ubuntu" && osInfo.ID != "debian" {
-		result.Passed = false
-		result.Errors = append(result.Errors, fmt.Sprintf("unsupported OS: %s (requires Ubuntu or Debian)", osInfo.ID))
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu or Debian)", osInfo.ID))
 	}
 
+	// Check required commands.
 	for _, cmd := range []string{"git", "make", "unzip"} {
 		if !CommandExists(cmd) {
 			result.Passed = false
@@ -48,7 +50,9 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 		}
 	}
 
+	// Check root — flag for sudo relaunch option.
 	if !IsRoot() {
+		result.NeedsRoot = true
 		result.Warnings = append(result.Warnings, "not running as root; sudo will be required")
 	}
 

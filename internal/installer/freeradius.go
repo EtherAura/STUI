@@ -38,17 +38,21 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 	result.OS = osInfo.ID
 	result.Version = osInfo.VersionID
 
+	// Check supported OS — warn but do not block on non-Ubuntu.
 	if osInfo.ID != "ubuntu" {
-		result.Passed = false
-		result.Errors = append(result.Errors, fmt.Sprintf("unsupported OS: %s (requires Ubuntu)", osInfo.ID))
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
 	}
 
+	// Check required commands.
 	if !CommandExists("git") {
 		result.Passed = false
 		result.Errors = append(result.Errors, "required command not found: git")
 	}
 
+	// Check root — flag for sudo relaunch option.
 	if !IsRoot() {
+		result.NeedsRoot = true
 		result.Warnings = append(result.Warnings, "not running as root; sudo will be required")
 	}
 

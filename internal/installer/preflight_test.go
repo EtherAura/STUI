@@ -7,6 +7,7 @@ package installer
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -61,7 +62,7 @@ func missingLookPath(cmds ...string) LookPathFunc {
 // CommandExistsWith, and verify the preflight check structure.
 
 // TestPortalPreflightCheckStructure verifies the Customer Portal preflight
-// returns OS info and fails on non-Ubuntu systems.
+// returns OS info and warns (not blocks) on non-Ubuntu systems.
 func TestPortalPreflightCheckStructure(t *testing.T) {
 	p := NewPortalInstaller()
 	ctx := context.Background()
@@ -79,14 +80,22 @@ func TestPortalPreflightCheckStructure(t *testing.T) {
 		t.Error("Version should be populated")
 	}
 
-	// If not on Ubuntu, expect errors
-	if result.OS != "ubuntu" && result.Passed {
-		t.Error("expected Passed=false on non-Ubuntu systems")
+	// Non-Ubuntu should produce a warning, not a blocking error.
+	if result.OS != "ubuntu" {
+		foundWarning := false
+		for _, w := range result.Warnings {
+			if strings.Contains(w, "unsupported OS") {
+				foundWarning = true
+			}
+		}
+		if !foundWarning {
+			t.Error("expected unsupported-OS warning on non-Ubuntu systems")
+		}
 	}
 }
 
 // TestNetflowPreflightCheckStructure verifies the Netflow preflight
-// returns OS info and accepts Ubuntu or Debian.
+// returns OS info and warns (not blocks) on unsupported distros.
 func TestNetflowPreflightCheckStructure(t *testing.T) {
 	n := NewNetflowInstaller()
 	ctx := context.Background()
@@ -100,9 +109,17 @@ func TestNetflowPreflightCheckStructure(t *testing.T) {
 		t.Error("OS should be populated")
 	}
 
-	// Netflow accepts ubuntu OR debian
-	if result.OS != "ubuntu" && result.OS != "debian" && result.Passed {
-		t.Error("expected Passed=false on non-Ubuntu/Debian systems")
+	// Non-Ubuntu/Debian should produce a warning, not a blocking error.
+	if result.OS != "ubuntu" && result.OS != "debian" {
+		foundWarning := false
+		for _, w := range result.Warnings {
+			if strings.Contains(w, "unsupported OS") {
+				foundWarning = true
+			}
+		}
+		if !foundWarning {
+			t.Error("expected unsupported-OS warning on non-Ubuntu/Debian systems")
+		}
 	}
 }
 
@@ -141,8 +158,9 @@ func TestPollerPreflightCheckStructure(t *testing.T) {
 // --- Simulated Preflight Logic Tests ---
 // These test the decision logic that PreflightCheck uses, with injected dependencies.
 
-// TestPreflightOSDecisions tests the OS acceptance logic used by
+// TestPreflightOSDecisions tests the OS matching logic used by
 // preflight checks, exercising ubuntu-only and ubuntu-or-debian rules.
+// Non-matching OSes now produce warnings rather than blocking errors.
 func TestPreflightOSDecisions(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -263,5 +281,58 @@ func TestVerifyMethodsReturnNil(t *testing.T) {
 				t.Errorf("Verify() returned unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+// --- NeedsRoot Tests ---
+
+// TestPreflightNeedsRootSet verifies all installers set NeedsRoot
+// when the process is not running as root.
+func TestPreflightNeedsRootSet(t *testing.T) {
+	if IsRoot() {
+		t.Skip("test requires non-root execution")
+	}
+
+	ctx := context.Background()
+	installers := []Installer{
+		NewPortalInstaller(),
+		NewNetflowInstaller(),
+		NewFreeRADIUSInstaller(),
+		NewPollerInstaller(),
+	}
+
+	for _, inst := range installers {
+		t.Run(inst.Name(), func(t *testing.T) {
+			result, err := inst.PreflightCheck(ctx)
+			if err != nil {
+				t.Fatalf("PreflightCheck returned error: %v", err)
+			}
+			if !result.NeedsRoot {
+				t.Error("NeedsRoot should be true when not running as root")
+			}
+		})
+	}
+}
+
+// TestPreflightOSWarningNotBlocking verifies that an unsupported OS
+// produces a warning but does not set Passed to false.
+func TestPreflightOSWarningNotBlocking(t *testing.T) {
+	// This test verifies the design decision: OS mismatch is a warning,
+	// not a blocker. We check this by examining the preflight results
+	// on the current host — if on a non-Ubuntu system, the result
+	// should still pass (assuming required commands are present).
+	p := NewPortalInstaller()
+	ctx := context.Background()
+
+	result, err := p.PreflightCheck(ctx)
+	if err != nil {
+		t.Fatalf("PreflightCheck returned error: %v", err)
+	}
+
+	// OS check should never produce blocking errors.
+	for _, e := range result.Errors {
+		if strings.Contains(e, "unsupported OS") {
+			t.Error("OS mismatch should be a warning, not a blocking error")
+		}
 	}
 }

@@ -48,6 +48,8 @@ type AppModel struct {
 	verify VerifyModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
+	// sudoRelaunch indicates the app should relaunch with sudo after quitting.
+	sudoRelaunch bool
 	// width and height of the terminal.
 	width  int
 	height int
@@ -110,6 +112,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.verify = NewVerifyModel(m.registry, msg.AppID)
 		m.screen = ScreenVerify
 		return m, m.verify.Init()
+	case SudoRelaunchMsg:
+		// Quit the TUI so main can relaunch with sudo.
+		m.sudoRelaunch = true
+		return m, tea.Quit
 	}
 
 	// Delegate to the active screen's sub-model.
@@ -159,6 +165,11 @@ func (m AppModel) View() string {
 // Quitting returns whether the model is in a quitting state.
 func (m AppModel) Quitting() bool {
 	return m.quitting
+}
+
+// SudoRelaunch returns whether the app should relaunch with sudo.
+func (m AppModel) SudoRelaunch() bool {
+	return m.sudoRelaunch
 }
 
 // Width returns the current terminal width.

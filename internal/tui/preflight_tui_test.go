@@ -141,12 +141,12 @@ func TestPreflightViewFailed(t *testing.T) {
 	m := NewPreflightModel(reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed: false,
-		OS:     "centos",
-		Errors: []string{"unsupported OS: centos"},
+		OS:     "ubuntu",
+		Errors: []string{"required command not found: git"},
 	}})
 	view := m.View()
 
-	if !strings.Contains(view, "unsupported OS") {
+	if !strings.Contains(view, "required command") {
 		t.Error("failed view should show error message")
 	}
 	if !strings.Contains(view, "failed") {
@@ -296,5 +296,106 @@ func TestAppModelPreflightBackToMenu(t *testing.T) {
 
 	if model.Screen() != ScreenMenu {
 		t.Errorf("screen = %d, want ScreenMenu (%d)", model.Screen(), ScreenMenu)
+	}
+}
+
+// TestPreflightSudoKeyOnNeedsRoot verifies pressing 's' produces
+// SudoRelaunchMsg when preflight reports NeedsRoot.
+func TestPreflightSudoKeyOnNeedsRoot(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:    true,
+		OS:        "ubuntu",
+		NeedsRoot: true,
+	}})
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("pressing 's' should produce a command when NeedsRoot is true")
+	}
+
+	msg := cmd()
+	_, ok := msg.(SudoRelaunchMsg)
+	if !ok {
+		t.Fatalf("expected SudoRelaunchMsg, got %T", msg)
+	}
+}
+
+// TestPreflightSudoKeyIgnoredWhenRoot verifies pressing 's' does nothing
+// when NeedsRoot is false.
+func TestPreflightSudoKeyIgnoredWhenRoot(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:    true,
+		OS:        "ubuntu",
+		NeedsRoot: false,
+	}})
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd != nil {
+		t.Error("pressing 's' should be ignored when NeedsRoot is false")
+	}
+}
+
+// TestPreflightViewNeedsRoot verifies the view shows a sudo relaunch
+// option when NeedsRoot is set.
+func TestPreflightViewNeedsRoot(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:    true,
+		OS:        "ubuntu",
+		NeedsRoot: true,
+		Warnings:  []string{"not running as root; sudo will be required"},
+	}})
+	view := m.View()
+
+	if !strings.Contains(view, "sudo") {
+		t.Error("view should mention sudo when NeedsRoot is true")
+	}
+	if !strings.Contains(view, "Press s") {
+		t.Error("view should show 'Press s' option when NeedsRoot is true")
+	}
+}
+
+// TestPreflightViewNoSudoWhenRoot verifies the view does not show
+// a sudo option when NeedsRoot is false.
+func TestPreflightViewNoSudoWhenRoot(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:    true,
+		OS:        "ubuntu",
+		NeedsRoot: false,
+	}})
+	view := m.View()
+
+	if strings.Contains(view, "Press s") {
+		t.Error("view should not show 'Press s' option when NeedsRoot is false")
+	}
+}
+
+// TestAppModelSudoRelaunch verifies SudoRelaunchMsg sets the flag
+// and triggers tea.Quit.
+func TestAppModelSudoRelaunch(t *testing.T) {
+	m := NewAppModel()
+
+	// Navigate to preflight.
+	updated, _ := m.Update(AppSelectedMsg{AppID: installer.AppCustomerPortal})
+	model := updated.(AppModel)
+	updated, _ = model.Update(StartPreflightMsg{AppID: installer.AppCustomerPortal})
+	model = updated.(AppModel)
+
+	// Simulate sudo relaunch.
+	updated, cmd := model.Update(SudoRelaunchMsg{})
+	model = updated.(AppModel)
+
+	if !model.SudoRelaunch() {
+		t.Error("SudoRelaunch() should be true after SudoRelaunchMsg")
+	}
+	if cmd == nil {
+		t.Error("SudoRelaunchMsg should produce a quit command")
 	}
 }

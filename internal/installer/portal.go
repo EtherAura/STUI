@@ -38,13 +38,13 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	result.OS = osInfo.ID
 	result.Version = osInfo.VersionID
 
-	// Check supported OS
+	// Check supported OS — warn but do not block on non-Ubuntu.
 	if osInfo.ID != "ubuntu" {
-		result.Passed = false
-		result.Errors = append(result.Errors, fmt.Sprintf("unsupported OS: %s (requires Ubuntu)", osInfo.ID))
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
 	}
 
-	// Check required commands
+	// Check required commands.
 	for _, cmd := range []string{"git", "curl"} {
 		if !CommandExists(cmd) {
 			result.Passed = false
@@ -52,8 +52,9 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 		}
 	}
 
-	// Check root
+	// Check root — flag for sudo relaunch option.
 	if !IsRoot() {
+		result.NeedsRoot = true
 		result.Warnings = append(result.Warnings, "not running as root; sudo will be required")
 	}
 

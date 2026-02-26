@@ -36,12 +36,15 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	result.OS = osInfo.ID
 	result.Version = osInfo.VersionID
 
+	// Check supported OS — warn but do not block on non-Ubuntu.
 	if osInfo.ID != "ubuntu" {
-		result.Passed = false
-		result.Errors = append(result.Errors, fmt.Sprintf("unsupported OS: %s (requires Ubuntu)", osInfo.ID))
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
 	}
 
+	// Check root — flag for sudo relaunch option.
 	if !IsRoot() {
+		result.NeedsRoot = true
 		result.Warnings = append(result.Warnings, "not running as root; sudo will be required")
 	}
 
