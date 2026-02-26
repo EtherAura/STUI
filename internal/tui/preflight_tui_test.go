@@ -370,6 +370,9 @@ func TestPreflightElevateKeyOnNeedsRoot(t *testing.T) {
 	if elevate.Escalation.Name != "sudo" {
 		t.Errorf("Escalation.Name = %q, want %q", elevate.Escalation.Name, "sudo")
 	}
+	if elevate.AppID != installer.AppCustomerPortal {
+		t.Errorf("AppID = %q, want %q", elevate.AppID, installer.AppCustomerPortal)
+	}
 }
 
 // TestPreflightElevateKeyIgnoredWhenRoot verifies pressing 's' does nothing
@@ -442,7 +445,7 @@ func TestAppModelElevateRelaunch(t *testing.T) {
 
 	// Simulate elevated relaunch.
 	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
-	updated, cmd := model.Update(ElevateMsg{Escalation: esc})
+	updated, cmd := model.Update(ElevateMsg{Escalation: esc, AppID: installer.AppCustomerPortal})
 	model = updated.(AppModel)
 
 	if !model.ElevateRelaunch() {
@@ -453,6 +456,9 @@ func TestAppModelElevateRelaunch(t *testing.T) {
 	}
 	if model.Escalation().Name != "sudo" {
 		t.Errorf("Escalation().Name = %q, want %q", model.Escalation().Name, "sudo")
+	}
+	if model.ResumeAppID() != installer.AppCustomerPortal {
+		t.Errorf("ResumeAppID() = %q, want %q", model.ResumeAppID(), installer.AppCustomerPortal)
 	}
 	if cmd == nil {
 		t.Error("ElevateMsg should produce a quit command")

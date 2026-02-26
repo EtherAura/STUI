@@ -64,6 +64,9 @@ type AppModel struct {
 	elevateRelaunch bool
 	// escalation holds the detected privilege escalation method for relaunch.
 	escalation *installer.EscalationMethod
+	// resumeAppID is the app to resume at after an elevated relaunch.
+	// Empty when starting normally.
+	resumeAppID string
 	// width and height of the terminal.
 	width  int
 	height int
@@ -80,8 +83,28 @@ func NewAppModel() AppModel {
 	}
 }
 
+// NewAppModelWithResume creates a root model that immediately
+// navigates to the preflight screen for the given app ID.
+// Used after a privilege-escalated relaunch so the user is returned
+// to the installer they were viewing.
+func NewAppModelWithResume(appID string) AppModel {
+	reg := installer.NewRegistry()
+	return AppModel{
+		registry:    reg,
+		screen:      ScreenPreflight,
+		menu:        NewMenuModel(),
+		preflight:   NewPreflightModel(reg, appID),
+		resumeAppID: appID,
+	}
+}
+
 // Init implements tea.Model. Initializes the active sub-model.
+// When resuming after an elevated relaunch, the preflight check
+// is started immediately instead of the menu.
 func (m AppModel) Init() tea.Cmd {
+	if m.resumeAppID != "" {
+		return m.preflight.Init()
+	}
 	return m.menu.Init()
 }
 
@@ -151,6 +174,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Quit the TUI so main can relaunch with elevated privileges.
 		m.elevateRelaunch = true
 		m.escalation = msg.Escalation
+		m.resumeAppID = msg.AppID
 		return m, tea.Quit
 	}
 
@@ -240,4 +264,10 @@ func (m AppModel) Height() int {
 // Screen returns the currently active screen.
 func (m AppModel) Screen() Screen {
 	return m.screen
+}
+
+// ResumeAppID returns the app ID to resume at after an elevated
+// relaunch, or an empty string if starting normally.
+func (m AppModel) ResumeAppID() string {
+	return m.resumeAppID
 }

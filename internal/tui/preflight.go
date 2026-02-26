@@ -36,6 +36,9 @@ type StartConfigMsg struct {
 type ElevateMsg struct {
 	// Escalation holds the detected privilege escalation method.
 	Escalation *installer.EscalationMethod
+	// AppID is the registry key of the installer the user was viewing,
+	// so the relaunched process can resume at the same screen.
+	AppID string
 }
 
 // PreflightModel runs and displays preflight check results for a
@@ -125,8 +128,9 @@ func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 				// Offer escalation relaunch when not running as root.
 				if m.result != nil && m.result.NeedsRoot && m.result.Escalation != nil {
 					esc := m.result.Escalation
+					appID := m.appID
 					return m, func() tea.Msg {
-						return ElevateMsg{Escalation: esc}
+						return ElevateMsg{Escalation: esc, AppID: appID}
 					}
 				}
 			case "esc", "backspace":

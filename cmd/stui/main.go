@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"syscall"
@@ -14,9 +15,21 @@ import (
 // main initializes and runs the Bubble Tea TUI program.
 // If the user requests a privilege escalation relaunch from the
 // preflight screen, the process replaces itself with the detected
-// escalation command (sudo or doas).
+// escalation command (sudo or doas). The --resume-app flag allows
+// the relaunched process to return directly to the installer
+// the user was viewing.
 func main() {
-	p := tea.NewProgram(tui.NewAppModel())
+	resumeApp := flag.String("resume-app", "", "app ID to resume after elevated relaunch")
+	flag.Parse()
+
+	var model tui.AppModel
+	if *resumeApp != "" {
+		model = tui.NewAppModelWithResume(*resumeApp)
+	} else {
+		model = tui.NewAppModel()
+	}
+
+	p := tea.NewProgram(model)
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -44,8 +57,13 @@ func relaunchElevated(m tui.AppModel) {
 		os.Exit(1)
 	}
 
-	// Build args: ["sudo|doas", "/path/to/stui", ...original args...]
-	args := append([]string{esc.Name, selfPath}, os.Args[1:]...)
+	// Build args: ["sudo|doas", "/path/to/stui", "--resume-app=<id>"].
+	// We construct a clean arg list rather than forwarding os.Args
+	// to avoid duplicating the --resume-app flag.
+	args := []string{esc.Name, selfPath}
+	if appID := m.ResumeAppID(); appID != "" {
+		args = append(args, "--resume-app="+appID)
+	}
 
 	fmt.Printf("Relaunching with %s...\n", esc.Name)
 	// Replace the current process with the escalation command.

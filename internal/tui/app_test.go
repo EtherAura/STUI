@@ -1,6 +1,6 @@
 // app_test.go contains unit tests for the root AppModel, covering
 // initialization, key handling, window resize, view rendering,
-// screen state, and graceful quit behavior.
+// screen state, resume after elevated relaunch, and graceful quit behavior.
 package tui
 
 import (
@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/EtherAura/stui/internal/installer"
 )
 
 // TestNewAppModel verifies a fresh model starts in a non-quitting state
@@ -195,5 +197,37 @@ func TestScreenConstants(t *testing.T) {
 	}
 	if ScreenMenu != 0 {
 		t.Errorf("ScreenMenu should be 0, got %d", ScreenMenu)
+	}
+}
+
+// TestNewAppModelWithResume verifies that the resume constructor starts
+// on the preflight screen for the specified app.
+func TestNewAppModelWithResume(t *testing.T) {
+	m := NewAppModelWithResume(installer.AppCustomerPortal)
+
+	if m.Screen() != ScreenPreflight {
+		t.Errorf("screen = %d, want ScreenPreflight (%d)", m.Screen(), ScreenPreflight)
+	}
+	if m.ResumeAppID() != installer.AppCustomerPortal {
+		t.Errorf("ResumeAppID() = %q, want %q", m.ResumeAppID(), installer.AppCustomerPortal)
+	}
+}
+
+// TestNewAppModelWithResumeInit verifies that Init on a resumed model
+// returns a command (from preflight init, not menu init).
+func TestNewAppModelWithResumeInit(t *testing.T) {
+	m := NewAppModelWithResume(installer.AppCustomerPortal)
+	cmd := m.Init()
+	if cmd == nil {
+		t.Error("Init() on resumed model should return a command")
+	}
+}
+
+// TestNewAppModelResumeAppIDEmpty verifies a normal model has
+// an empty ResumeAppID.
+func TestNewAppModelResumeAppIDEmpty(t *testing.T) {
+	m := NewAppModel()
+	if m.ResumeAppID() != "" {
+		t.Errorf("ResumeAppID() = %q, want empty", m.ResumeAppID())
 	}
 }
