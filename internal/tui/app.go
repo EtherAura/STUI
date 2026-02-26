@@ -12,8 +12,10 @@ type Screen int
 
 // Screen constants enumerate all screens in the application flow.
 const (
-	// ScreenMenu is the main application selection menu.
+	// ScreenMenu is the top-level category menu.
 	ScreenMenu Screen = iota
+	// ScreenInstallers is the app selection sub-menu under Installers.
+	ScreenInstallers
 	// ScreenDetail shows app details and a confirm/back prompt.
 	ScreenDetail
 	// ScreenPreflight runs and displays preflight checks.
@@ -24,6 +26,10 @@ const (
 	ScreenInstall
 	// ScreenVerify displays post-install verification results.
 	ScreenVerify
+	// ScreenSettings is the settings configuration screen.
+	ScreenSettings
+	// ScreenHelp shows help information and keyboard shortcuts.
+	ScreenHelp
 )
 
 // AppModel is the root model for the STUI application.
@@ -34,8 +40,10 @@ type AppModel struct {
 	registry installer.Registry
 	// screen is the currently active screen.
 	screen Screen
-	// menu is the main application selection menu model.
+	// menu is the top-level category menu model.
 	menu MenuModel
+	// installerList is the installer selection sub-menu model.
+	installerList InstallerListModel
 	// detail is the app detail/confirm screen model.
 	detail DetailModel
 	// preflight is the preflight check screen model.
@@ -46,23 +54,29 @@ type AppModel struct {
 	progress ProgressModel
 	// verify is the post-install verification screen model.
 	verify VerifyModel
+	// settings is the settings screen model.
+	settings SettingsModel
+	// help is the help screen model.
+	help HelpModel
 	// quitting indicates the user has requested to quit.
 	quitting bool
-	// sudoRelaunch indicates the app should relaunch with sudo after quitting.
-	sudoRelaunch bool
+	// elevateRelaunch indicates the app should relaunch with elevated privileges.
+	elevateRelaunch bool
+	// escalation holds the detected privilege escalation method for relaunch.
+	escalation *installer.EscalationMethod
 	// width and height of the terminal.
 	width  int
 	height int
 }
 
 // NewAppModel creates a new root application model with the
-// default installer registry and menu pre-loaded.
+// default installer registry and top-level menu pre-loaded.
 func NewAppModel() AppModel {
 	reg := installer.NewRegistry()
 	return AppModel{
 		registry: reg,
 		screen:   ScreenMenu,
-		menu:     NewMenuModel(reg),
+		menu:     NewMenuModel(),
 	}
 }
 
@@ -83,14 +97,35 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case CategorySelectedMsg:
+		// Transition from top-level menu to a category screen.
+		switch msg.Category {
+		case CategoryInstallers:
+			m.installerList = NewInstallerListModel(m.registry)
+			m.screen = ScreenInstallers
+			return m, nil
+		case CategorySettings:
+			m.settings = NewSettingsModel()
+			m.screen = ScreenSettings
+			return m, nil
+		case CategoryHelp:
+			m.help = NewHelpModel()
+			m.screen = ScreenHelp
+			return m, nil
+		}
 	case AppSelectedMsg:
-		// Transition from menu to detail screen.
+		// Transition from installer list to detail screen.
 		m.detail = NewDetailModel(m.registry, msg.AppID)
 		m.screen = ScreenDetail
 		return m, nil
 	case BackToMenuMsg:
-		// Return to the main menu.
-		m.screen = ScreenMenu
+		// Return to the appropriate parent screen.
+		switch m.screen {
+		case ScreenDetail:
+			m.screen = ScreenInstallers
+		default:
+			m.screen = ScreenMenu
+		}
 		return m, nil
 	case StartPreflightMsg:
 		// Transition from detail to preflight screen.
@@ -112,9 +147,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.verify = NewVerifyModel(m.registry, msg.AppID)
 		m.screen = ScreenVerify
 		return m, m.verify.Init()
-	case SudoRelaunchMsg:
-		// Quit the TUI so main can relaunch with sudo.
-		m.sudoRelaunch = true
+	case ElevateMsg:
+		// Quit the TUI so main can relaunch with elevated privileges.
+		m.elevateRelaunch = true
+		m.escalation = msg.Escalation
 		return m, tea.Quit
 	}
 
@@ -123,6 +159,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case ScreenMenu:
 		m.menu, cmd = m.menu.Update(msg)
+	case ScreenInstallers:
+		m.installerList, cmd = m.installerList.Update(msg)
 	case ScreenDetail:
 		m.detail, cmd = m.detail.Update(msg)
 	case ScreenPreflight:
@@ -133,6 +171,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.progress, cmd = m.progress.Update(msg)
 	case ScreenVerify:
 		m.verify, cmd = m.verify.Update(msg)
+	case ScreenSettings:
+		m.settings, cmd = m.settings.Update(msg)
+	case ScreenHelp:
+		m.help, cmd = m.help.Update(msg)
 	}
 
 	return m, cmd
@@ -147,6 +189,8 @@ func (m AppModel) View() string {
 	switch m.screen {
 	case ScreenMenu:
 		return m.menu.View()
+	case ScreenInstallers:
+		return m.installerList.View()
 	case ScreenDetail:
 		return m.detail.View()
 	case ScreenPreflight:
@@ -157,6 +201,10 @@ func (m AppModel) View() string {
 		return m.progress.View()
 	case ScreenVerify:
 		return m.verify.View()
+	case ScreenSettings:
+		return m.settings.View()
+	case ScreenHelp:
+		return m.help.View()
 	default:
 		return ""
 	}
@@ -167,9 +215,16 @@ func (m AppModel) Quitting() bool {
 	return m.quitting
 }
 
-// SudoRelaunch returns whether the app should relaunch with sudo.
-func (m AppModel) SudoRelaunch() bool {
-	return m.sudoRelaunch
+// ElevateRelaunch returns whether the app should relaunch with
+// elevated privileges.
+func (m AppModel) ElevateRelaunch() bool {
+	return m.elevateRelaunch
+}
+
+// Escalation returns the detected privilege escalation method,
+// or nil if none was detected.
+func (m AppModel) Escalation() *installer.EscalationMethod {
+	return m.escalation
 }
 
 // Width returns the current terminal width.

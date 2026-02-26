@@ -344,15 +344,17 @@ func TestAppModelPreflightBackToMenu(t *testing.T) {
 	}
 }
 
-// TestPreflightSudoKeyOnNeedsRoot verifies pressing 's' produces
-// SudoRelaunchMsg when preflight reports NeedsRoot.
-func TestPreflightSudoKeyOnNeedsRoot(t *testing.T) {
+// TestPreflightElevateKeyOnNeedsRoot verifies pressing 's' produces
+// ElevateMsg when preflight reports NeedsRoot with a detected escalation.
+func TestPreflightElevateKeyOnNeedsRoot(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
-		Passed:    true,
-		OS:        "ubuntu",
-		NeedsRoot: true,
+		Passed:     true,
+		OS:         "ubuntu",
+		NeedsRoot:  true,
+		Escalation: esc,
 	}})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
@@ -361,15 +363,18 @@ func TestPreflightSudoKeyOnNeedsRoot(t *testing.T) {
 	}
 
 	msg := cmd()
-	_, ok := msg.(SudoRelaunchMsg)
+	elevate, ok := msg.(ElevateMsg)
 	if !ok {
-		t.Fatalf("expected SudoRelaunchMsg, got %T", msg)
+		t.Fatalf("expected ElevateMsg, got %T", msg)
+	}
+	if elevate.Escalation.Name != "sudo" {
+		t.Errorf("Escalation.Name = %q, want %q", elevate.Escalation.Name, "sudo")
 	}
 }
 
-// TestPreflightSudoKeyIgnoredWhenRoot verifies pressing 's' does nothing
+// TestPreflightElevateKeyIgnoredWhenRoot verifies pressing 's' does nothing
 // when NeedsRoot is false.
-func TestPreflightSudoKeyIgnoredWhenRoot(t *testing.T) {
+func TestPreflightElevateKeyIgnoredWhenRoot(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewPreflightModel(reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
@@ -384,30 +389,32 @@ func TestPreflightSudoKeyIgnoredWhenRoot(t *testing.T) {
 	}
 }
 
-// TestPreflightViewNeedsRoot verifies the view shows a sudo relaunch
-// option when NeedsRoot is set.
+// TestPreflightViewNeedsRoot verifies the view shows an escalation relaunch
+// option when NeedsRoot is set with a detected escalation method.
 func TestPreflightViewNeedsRoot(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
-		Passed:    true,
-		OS:        "ubuntu",
-		NeedsRoot: true,
-		Warnings:  []string{"not running as root; elevated privileges are required"},
+		Passed:     true,
+		OS:         "ubuntu",
+		NeedsRoot:  true,
+		Escalation: esc,
+		Warnings:   []string{"not running as root; elevated privileges are required"},
 	}})
 	view := m.View()
 
 	if !strings.Contains(view, "sudo") {
-		t.Error("view should mention sudo when NeedsRoot is true")
+		t.Error("view should mention the escalation command when NeedsRoot is true")
 	}
 	if !strings.Contains(view, "Press s") {
 		t.Error("view should show 'Press s' option when NeedsRoot is true")
 	}
 }
 
-// TestPreflightViewNoSudoWhenRoot verifies the view does not show
-// a sudo option when NeedsRoot is false.
-func TestPreflightViewNoSudoWhenRoot(t *testing.T) {
+// TestPreflightViewNoEscalationWhenRoot verifies the view does not show
+// an escalation option when NeedsRoot is false.
+func TestPreflightViewNoEscalationWhenRoot(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewPreflightModel(reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
@@ -422,9 +429,9 @@ func TestPreflightViewNoSudoWhenRoot(t *testing.T) {
 	}
 }
 
-// TestAppModelSudoRelaunch verifies SudoRelaunchMsg sets the flag
+// TestAppModelElevateRelaunch verifies ElevateMsg sets the flag
 // and triggers tea.Quit.
-func TestAppModelSudoRelaunch(t *testing.T) {
+func TestAppModelElevateRelaunch(t *testing.T) {
 	m := NewAppModel()
 
 	// Navigate to preflight.
@@ -433,14 +440,21 @@ func TestAppModelSudoRelaunch(t *testing.T) {
 	updated, _ = model.Update(StartPreflightMsg{AppID: installer.AppCustomerPortal})
 	model = updated.(AppModel)
 
-	// Simulate sudo relaunch.
-	updated, cmd := model.Update(SudoRelaunchMsg{})
+	// Simulate elevated relaunch.
+	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
+	updated, cmd := model.Update(ElevateMsg{Escalation: esc})
 	model = updated.(AppModel)
 
-	if !model.SudoRelaunch() {
-		t.Error("SudoRelaunch() should be true after SudoRelaunchMsg")
+	if !model.ElevateRelaunch() {
+		t.Error("ElevateRelaunch() should be true after ElevateMsg")
+	}
+	if model.Escalation() == nil {
+		t.Error("Escalation() should not be nil after ElevateMsg")
+	}
+	if model.Escalation().Name != "sudo" {
+		t.Errorf("Escalation().Name = %q, want %q", model.Escalation().Name, "sudo")
 	}
 	if cmd == nil {
-		t.Error("SudoRelaunchMsg should produce a quit command")
+		t.Error("ElevateMsg should produce a quit command")
 	}
 }

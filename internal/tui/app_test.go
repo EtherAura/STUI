@@ -132,17 +132,49 @@ func TestAppModelUnhandledMsg(t *testing.T) {
 }
 
 // TestAppModelAppSelectedMsg verifies that receiving an AppSelectedMsg
-// is handled without error (transition logic is a TODO).
+// transitions from the installer list to the detail screen.
 func TestAppModelAppSelectedMsg(t *testing.T) {
 	m := NewAppModel()
-	updated, cmd := m.Update(AppSelectedMsg{AppID: "customer-portal"})
+
+	// Navigate to installer list first via CategorySelectedMsg.
+	updated, _ := m.Update(CategorySelectedMsg{Category: CategoryInstallers})
 	model := updated.(AppModel)
 
+	// Now select an app.
+	updated, cmd := model.Update(AppSelectedMsg{AppID: "customer-portal"})
+	model = updated.(AppModel)
+
 	if cmd != nil {
-		t.Error("AppSelectedMsg should not produce a command yet")
+		t.Error("AppSelectedMsg should not produce a command")
 	}
-	if model.Quitting() {
-		t.Error("AppSelectedMsg should not cause quitting")
+	if model.Screen() != ScreenDetail {
+		t.Errorf("screen = %d, want ScreenDetail (%d)", model.Screen(), ScreenDetail)
+	}
+}
+
+// TestAppModelCategorySelected verifies CategorySelectedMsg transitions
+// to the correct screen for each category.
+func TestAppModelCategorySelected(t *testing.T) {
+	tests := []struct {
+		name     string
+		category string
+		screen   Screen
+	}{
+		{"installers", CategoryInstallers, ScreenInstallers},
+		{"settings", CategorySettings, ScreenSettings},
+		{"help", CategoryHelp, ScreenHelp},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewAppModel()
+			updated, _ := m.Update(CategorySelectedMsg{Category: tt.category})
+			model := updated.(AppModel)
+
+			if model.Screen() != tt.screen {
+				t.Errorf("screen = %d, want %d", model.Screen(), tt.screen)
+			}
+		})
 	}
 }
 
@@ -150,8 +182,9 @@ func TestAppModelAppSelectedMsg(t *testing.T) {
 // and start from zero.
 func TestScreenConstants(t *testing.T) {
 	screens := []Screen{
-		ScreenMenu, ScreenDetail, ScreenPreflight,
+		ScreenMenu, ScreenInstallers, ScreenDetail, ScreenPreflight,
 		ScreenConfig, ScreenInstall, ScreenVerify,
+		ScreenSettings, ScreenHelp,
 	}
 	seen := make(map[Screen]bool)
 	for _, s := range screens {

@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,8 +12,9 @@ import (
 )
 
 // main initializes and runs the Bubble Tea TUI program.
-// If the user requests a sudo relaunch from the preflight screen,
-// the process replaces itself with a sudo-wrapped invocation.
+// If the user requests a privilege escalation relaunch from the
+// preflight screen, the process replaces itself with the detected
+// escalation command (sudo or doas).
 func main() {
 	p := tea.NewProgram(tui.NewAppModel())
 	finalModel, err := p.Run()
@@ -23,18 +23,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Check if the TUI requested a sudo relaunch.
-	if m, ok := finalModel.(tui.AppModel); ok && m.SudoRelaunch() {
-		relaunchWithSudo()
+	// Check if the TUI requested a privilege escalation relaunch.
+	if m, ok := finalModel.(tui.AppModel); ok && m.ElevateRelaunch() {
+		relaunchElevated(m)
 	}
 }
 
-// relaunchWithSudo replaces the current process with a sudo-wrapped
-// invocation of the same binary and arguments.
-func relaunchWithSudo() {
-	sudoPath, err := exec.LookPath("sudo")
-	if err != nil {
-		fmt.Println("Error: sudo not found on PATH")
+// relaunchElevated replaces the current process with a privilege-
+// escalated invocation using the detected method (sudo or doas).
+func relaunchElevated(m tui.AppModel) {
+	esc := m.Escalation()
+	if esc == nil {
+		fmt.Println("Error: no privilege escalation command available")
 		os.Exit(1)
 	}
 
@@ -44,13 +44,13 @@ func relaunchWithSudo() {
 		os.Exit(1)
 	}
 
-	// Build args: ["sudo", "/path/to/stui", ...original args...]
-	args := append([]string{"sudo", selfPath}, os.Args[1:]...)
+	// Build args: ["sudo|doas", "/path/to/stui", ...original args...]
+	args := append([]string{esc.Name, selfPath}, os.Args[1:]...)
 
-	fmt.Println("Relaunching with sudo...")
-	// Replace the current process with sudo.
-	if err := syscall.Exec(sudoPath, args, os.Environ()); err != nil {
-		fmt.Printf("Error: failed to exec sudo: %v\n", err)
+	fmt.Printf("Relaunching with %s...\n", esc.Name)
+	// Replace the current process with the escalation command.
+	if err := syscall.Exec(esc.Path, args, os.Environ()); err != nil {
+		fmt.Printf("Error: failed to exec %s: %v\n", esc.Name, err)
 		os.Exit(1)
 	}
 }

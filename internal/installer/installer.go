@@ -82,6 +82,9 @@ type PreflightResult struct {
 	// NeedsRoot is true when the process is not running as root and
 	// the installer requires elevated privileges.
 	NeedsRoot bool
+	// Escalation is the detected privilege escalation method (sudo/doas),
+	// or nil if none is available. Only set when NeedsRoot is true.
+	Escalation *EscalationMethod
 }
 
 // Installer is the interface that all Sonar application installers implement.

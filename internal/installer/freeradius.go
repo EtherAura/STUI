@@ -59,9 +59,10 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 		result.Errors = append(result.Errors, "required command not found: git")
 	}
 
-	// Check root — flag for sudo relaunch option.
+	// Check root — flag for sudo/doas relaunch option.
 	if !IsRoot() {
 		result.NeedsRoot = true
+		result.Escalation = DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 

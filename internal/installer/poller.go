@@ -50,9 +50,10 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
 	}
 
-	// Check root — flag for sudo relaunch option.
+	// Check root — flag for sudo/doas relaunch option.
 	if !IsRoot() {
 		result.NeedsRoot = true
+		result.Escalation = DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 

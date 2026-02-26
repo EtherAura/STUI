@@ -31,9 +31,12 @@ type StartConfigMsg struct {
 	AppID string
 }
 
-// SudoRelaunchMsg signals that the application should quit and
-// relaunch itself with sudo for elevated privileges.
-type SudoRelaunchMsg struct{}
+// ElevateMsg signals that the application should quit and
+// relaunch itself with the detected escalation command (sudo/doas).
+type ElevateMsg struct {
+	// Escalation holds the detected privilege escalation method.
+	Escalation *installer.EscalationMethod
+}
 
 // PreflightModel runs and displays preflight check results for a
 // selected application installer.
@@ -119,10 +122,11 @@ func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 					}
 				}
 			case "s":
-				// Offer sudo relaunch when not running as root.
-				if m.result != nil && m.result.NeedsRoot {
+				// Offer escalation relaunch when not running as root.
+				if m.result != nil && m.result.NeedsRoot && m.result.Escalation != nil {
+					esc := m.result.Escalation
 					return m, func() tea.Msg {
-						return SudoRelaunchMsg{}
+						return ElevateMsg{Escalation: esc}
 					}
 				}
 			case "esc", "backspace":
@@ -216,9 +220,15 @@ func (m PreflightModel) View() string {
 			b.WriteString("\n\n")
 		}
 
-		// Sudo relaunch option when not running as root.
+		// Escalation relaunch option when not running as root.
 		if m.result.NeedsRoot {
-			b.WriteString(WarningStyle.Render("Press s to restart with sudo"))
+			if m.result.Escalation != nil {
+				b.WriteString(WarningStyle.Render(
+					fmt.Sprintf("Press s to restart with %s", m.result.Escalation.Name)))
+			} else {
+				b.WriteString(WarningStyle.Render(
+					"No privilege escalation command found (install sudo or doas)"))
+			}
 			b.WriteString("\n")
 		}
 

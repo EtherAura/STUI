@@ -179,7 +179,7 @@ func TestAppModelTransitionToDetail(t *testing.T) {
 }
 
 // TestAppModelTransitionBackToMenu verifies that BackToMenuMsg
-// returns from detail to menu screen.
+// returns from detail to the installer list screen.
 func TestAppModelTransitionBackToMenu(t *testing.T) {
 	m := NewAppModel()
 
@@ -191,7 +191,7 @@ func TestAppModelTransitionBackToMenu(t *testing.T) {
 	updated, _ = model.Update(BackToMenuMsg{})
 	model = updated.(AppModel)
 
-	if model.Screen() != ScreenMenu {
-		t.Errorf("screen = %d, want ScreenMenu (%d)", model.Screen(), ScreenMenu)
+	if model.Screen() != ScreenInstallers {
+		t.Errorf("screen = %d, want ScreenInstallers (%d)", model.Screen(), ScreenInstallers)
 	}
 }

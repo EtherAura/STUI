@@ -1,15 +1,12 @@
-// menu.go implements the main application selection menu screen.
-// It wraps a bubbles/list component populated from the installer
-// registry, letting the user browse and select a Sonar application
-// to install.
+// menu.go implements the top-level category menu screen.
+// This is the first screen the user sees, presenting three categories:
+// Installers (Sonar app installation), Settings, and Help.
 package tui
 
 import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/EtherAura/stui/internal/installer"
 )
 
 // defaultMenuWidth is the fallback menu width before a WindowSizeMsg arrives.
@@ -18,19 +15,29 @@ const defaultMenuWidth = 60
 // defaultMenuHeight is the fallback menu height before a WindowSizeMsg arrives.
 const defaultMenuHeight = 20
 
-// AppSelectedMsg is sent when the user selects an application from the menu.
-type AppSelectedMsg struct {
-	// AppID is the registry key of the selected application.
-	AppID string
+// Category constants identify the top-level menu categories.
+const (
+	// CategoryInstallers opens the Sonar application installer list.
+	CategoryInstallers = "installers"
+	// CategorySettings opens the settings screen.
+	CategorySettings = "settings"
+	// CategoryHelp opens the help screen.
+	CategoryHelp = "help"
+)
+
+// CategorySelectedMsg is sent when the user selects a top-level category.
+type CategorySelectedMsg struct {
+	// Category is the selected category identifier.
+	Category string
 }
 
-// menuItem adapts an installer entry into a bubbles/list item.
+// menuItem adapts a category entry into a bubbles/list item.
 type menuItem struct {
-	// appID is the registry key for looking up the installer.
-	appID string
-	// name is the display name of the application.
+	// category is the identifier for the category.
+	category string
+	// name is the display name of the category.
 	name string
-	// desc is the short description of the application.
+	// desc is a short description of the category.
 	desc string
 }
 
@@ -60,25 +67,39 @@ func newMenuDelegate() menuDelegate {
 	return menuDelegate{DefaultDelegate: d}
 }
 
-// MenuModel is the Bubble Tea model for the main menu screen.
+// MenuModel is the Bubble Tea model for the top-level category menu.
 type MenuModel struct {
 	// list is the underlying bubbles list component.
 	list list.Model
-	// registry holds the installer constructors for reference.
-	registry installer.Registry
 }
 
-// NewMenuModel creates a new menu model populated from the given registry.
-func NewMenuModel(reg installer.Registry) MenuModel {
-	items := buildMenuItems(reg)
-	delegate := newMenuDelegate()
+// NewMenuModel creates a new top-level menu with the three categories.
+func NewMenuModel() MenuModel {
+	items := []list.Item{
+		menuItem{
+			category: CategoryInstallers,
+			name:     "Installers",
+			desc:     "Install and manage Sonar applications",
+		},
+		menuItem{
+			category: CategorySettings,
+			name:     "Settings",
+			desc:     "Configure STUI preferences",
+		},
+		menuItem{
+			category: CategoryHelp,
+			name:     "Help",
+			desc:     "Documentation and support information",
+		},
+	}
 
+	delegate := newMenuDelegate()
 	l := list.New(items, delegate, defaultMenuWidth, defaultMenuHeight)
 	l.Title = "STUI — Sonar Terminal User Interface"
 	l.Styles.Title = BannerStyle.
 		Padding(0, 1).
 		MarginBottom(1)
-	l.SetShowStatusBar(true)
+	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowHelp(true)
 
@@ -92,30 +113,7 @@ func NewMenuModel(reg installer.Registry) MenuModel {
 		}
 	}
 
-	return MenuModel{
-		list:     l,
-		registry: reg,
-	}
-}
-
-// buildMenuItems converts registry entries into bubbles list items,
-// preserving the display order defined by Registry.List().
-func buildMenuItems(reg installer.Registry) []list.Item {
-	ids := reg.List()
-	items := make([]list.Item, 0, len(ids))
-	for _, id := range ids {
-		ctor, ok := reg[id]
-		if !ok {
-			continue
-		}
-		inst := ctor()
-		items = append(items, menuItem{
-			appID: id,
-			name:  inst.Name(),
-			desc:  inst.Description(),
-		})
-	}
-	return items
+	return MenuModel{list: l}
 }
 
 // Init implements tea.Model. No initial command needed.
@@ -130,7 +128,6 @@ func (m MenuModel) Update(msg tea.Msg) (MenuModel, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q":
-			// Let the parent handle quit.
 			return m, tea.Quit
 		case "enter":
 			return m, m.selectCurrentItem()
@@ -146,7 +143,7 @@ func (m MenuModel) Update(msg tea.Msg) (MenuModel, tea.Cmd) {
 	return m, cmd
 }
 
-// selectCurrentItem returns a command that produces an AppSelectedMsg
+// selectCurrentItem returns a command that produces a CategorySelectedMsg
 // for the currently highlighted menu item.
 func (m MenuModel) selectCurrentItem() tea.Cmd {
 	item, ok := m.list.SelectedItem().(menuItem)
@@ -154,23 +151,23 @@ func (m MenuModel) selectCurrentItem() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		return AppSelectedMsg{AppID: item.appID}
+		return CategorySelectedMsg{Category: item.category}
 	}
 }
 
-// View implements tea.Model. Renders the list.
+// View implements tea.Model. Renders the menu list.
 func (m MenuModel) View() string {
 	return AppStyle.Render(m.list.View())
 }
 
-// SelectedAppID returns the app ID of the currently highlighted item,
+// SelectedCategory returns the category of the currently highlighted item,
 // or an empty string if nothing is selected.
-func (m MenuModel) SelectedAppID() string {
+func (m MenuModel) SelectedCategory() string {
 	item, ok := m.list.SelectedItem().(menuItem)
 	if !ok {
 		return ""
 	}
-	return item.appID
+	return item.category
 }
 
 // Ensure menuItem satisfies the list.DefaultItem interface at compile time.
