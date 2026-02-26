@@ -65,6 +65,8 @@ func relaunchElevated(m tui.AppModel) {
 		args = append(args, "--resume-app="+appID)
 	}
 
+	// Clear the terminal so the relaunched process starts clean.
+	fmt.Print("\033[H\033[2J")
 	fmt.Printf("Relaunching with %s...\n", esc.Name)
 	// Replace the current process with the escalation command.
 	if err := syscall.Exec(esc.Path, args, os.Environ()); err != nil {
