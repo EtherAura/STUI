@@ -3,6 +3,7 @@
 ## Contents
 
 - [Architecture](architecture.md) — Project structure and design decisions
+- [Dependencies](dependencies.md) — Every dependency explained in detail
 - [Installers](installers.md) — How each Sonar app installer works
 - [Development](development.md) — Building, testing, and contributing
 
