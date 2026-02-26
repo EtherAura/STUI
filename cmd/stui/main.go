@@ -10,6 +10,7 @@ import (
 	"github.com/SonarSoftwareInc/stui/internal/tui"
 )
 
+// main initializes and runs the Bubble Tea TUI program.
 func main() {
 	p := tea.NewProgram(tui.NewAppModel())
 	if _, err := p.Run(); err != nil {

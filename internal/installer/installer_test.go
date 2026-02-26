@@ -1,3 +1,7 @@
+// installer_test.go contains unit tests for the core installer types:
+// Config validation, OS release parsing, OS detection, command lookup,
+// registry construction, interface compliance, install flow validation,
+// and step structure for each Sonar application.
 package installer
 
 import (
@@ -7,8 +11,8 @@ import (
 	"testing"
 )
 
-// --- Config Validation Tests ---
-
+// TestConfigValidate verifies Config.Validate rejects missing, non-HTTPS,
+// and trailing-slash URLs while accepting well-formed ones.
 func TestConfigValidate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -57,6 +61,7 @@ func TestConfigValidate(t *testing.T) {
 	}
 }
 
+// TestConfigExtra verifies that the Extra map survives validation untouched.
 func TestConfigExtra(t *testing.T) {
 	cfg := Config{
 		SonarURL: "https://myisp.sonar.software",
@@ -70,8 +75,9 @@ func TestConfigExtra(t *testing.T) {
 	}
 }
 
-// --- ParseOSRelease Tests ---
-
+// TestParseOSRelease verifies parsing of /etc/os-release content across
+// multiple distros, edge cases (comments, blank lines, unquoted values),
+// and malformed input.
 func TestParseOSRelease(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -149,8 +155,8 @@ VERSION_ID=2.15`,
 	}
 }
 
-// --- DetectOSWith Tests ---
-
+// TestDetectOSWith verifies OS detection with injected file readers,
+// covering valid data, read errors, and empty os-release files.
 func TestDetectOSWith(t *testing.T) {
 	t.Run("valid ubuntu", func(t *testing.T) {
 		fakeReader := func(path string) ([]byte, error) {
@@ -206,8 +212,8 @@ PRETTY_NAME="Ubuntu 24.04 LTS"`), nil
 	})
 }
 
-// --- CommandExistsWith Tests ---
-
+// TestCommandExistsWith verifies command lookup with injected LookPathFunc,
+// covering both found and not-found scenarios.
 func TestCommandExistsWith(t *testing.T) {
 	t.Run("command found", func(t *testing.T) {
 		fakeLookPath := func(name string) (string, error) {
@@ -228,8 +234,8 @@ func TestCommandExistsWith(t *testing.T) {
 	})
 }
 
-// --- Registry Tests ---
-
+// TestRegistryList verifies that the registry lists all four apps in
+// the expected display order.
 func TestRegistryList(t *testing.T) {
 	reg := NewRegistry()
 
@@ -246,6 +252,8 @@ func TestRegistryList(t *testing.T) {
 	}
 }
 
+// TestRegistryConstructors verifies each registry entry produces a
+// non-nil installer with a non-empty Name, Description, and Steps.
 func TestRegistryConstructors(t *testing.T) {
 	reg := NewRegistry()
 
@@ -272,8 +280,8 @@ func TestRegistryConstructors(t *testing.T) {
 	}
 }
 
-// --- Interface Compliance Tests ---
-
+// TestInstallerInterfaceCompliance is a compile-time check that all
+// four installer types satisfy the Installer interface.
 func TestInstallerInterfaceCompliance(_ *testing.T) {
 	// Verify all installer types satisfy the Installer interface at compile time.
 	var _ Installer = (*PortalInstaller)(nil)
@@ -282,8 +290,8 @@ func TestInstallerInterfaceCompliance(_ *testing.T) {
 	var _ Installer = (*PollerInstaller)(nil)
 }
 
-// --- Install Method Tests (config validation paths) ---
-
+// TestPortalInstallValidation tests the Customer Portal install flow:
+// missing URL, missing domain, and a valid config that runs all steps.
 func TestPortalInstallValidation(t *testing.T) {
 	p := NewPortalInstaller()
 	ctx := context.Background()
@@ -329,6 +337,8 @@ func TestPortalInstallValidation(t *testing.T) {
 	})
 }
 
+// TestNetflowInstallValidation tests the Netflow install flow:
+// missing API token, missing public IP, and a valid config.
 func TestNetflowInstallValidation(t *testing.T) {
 	n := NewNetflowInstaller()
 	ctx := context.Background()
@@ -374,6 +384,7 @@ func TestNetflowInstallValidation(t *testing.T) {
 	})
 }
 
+// TestPollerInstallValidation tests the Poller install flow with a valid config.
 func TestPollerInstallValidation(t *testing.T) {
 	p := NewPollerInstaller()
 	ctx := context.Background()
@@ -391,6 +402,7 @@ func TestPollerInstallValidation(t *testing.T) {
 	})
 }
 
+// TestFreeRADIUSInstallValidation tests the FreeRADIUS install flow with a valid config.
 func TestFreeRADIUSInstallValidation(t *testing.T) {
 	f := NewFreeRADIUSInstaller()
 	ctx := context.Background()
@@ -408,8 +420,8 @@ func TestFreeRADIUSInstallValidation(t *testing.T) {
 	})
 }
 
-// --- Step Structure Tests ---
-
+// TestPortalSteps verifies the Customer Portal returns three ordered steps
+// with non-nil actions.
 func TestPortalSteps(t *testing.T) {
 	p := NewPortalInstaller()
 	steps := p.Steps()
@@ -428,6 +440,7 @@ func TestPortalSteps(t *testing.T) {
 	}
 }
 
+// TestNetflowSteps verifies Netflow returns four ordered steps.
 func TestNetflowSteps(t *testing.T) {
 	n := NewNetflowInstaller()
 	steps := n.Steps()
@@ -443,6 +456,7 @@ func TestNetflowSteps(t *testing.T) {
 	}
 }
 
+// TestFreeRADIUSSteps verifies FreeRADIUS returns three steps ending with "Run genie".
 func TestFreeRADIUSSteps(t *testing.T) {
 	f := NewFreeRADIUSInstaller()
 	steps := f.Steps()
@@ -455,6 +469,7 @@ func TestFreeRADIUSSteps(t *testing.T) {
 	}
 }
 
+// TestPollerSteps verifies the Poller returns two steps starting with "Download setup script".
 func TestPollerSteps(t *testing.T) {
 	p := NewPollerInstaller()
 	steps := p.Steps()
@@ -467,12 +482,12 @@ func TestPollerSteps(t *testing.T) {
 	}
 }
 
-// --- Helper ---
-
+// contains reports whether substr is found within s.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchSubstring(s, substr)
 }
 
+// searchSubstring performs a brute-force substring search.
 func searchSubstring(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {

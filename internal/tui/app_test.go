@@ -1,3 +1,6 @@
+// app_test.go contains unit tests for the root AppModel, covering
+// initialization, key handling, window resize, view rendering, and
+// graceful quit behavior.
 package tui
 
 import (
@@ -7,6 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// TestNewAppModel verifies a fresh model starts in a non-quitting state
+// with zero dimensions.
 func TestNewAppModel(t *testing.T) {
 	m := NewAppModel()
 	if m.Quitting() {
@@ -17,6 +22,7 @@ func TestNewAppModel(t *testing.T) {
 	}
 }
 
+// TestAppModelInit verifies Init returns no initial command.
 func TestAppModelInit(t *testing.T) {
 	m := NewAppModel()
 	cmd := m.Init()
@@ -25,6 +31,8 @@ func TestAppModelInit(t *testing.T) {
 	}
 }
 
+// TestAppModelView verifies the default view contains the banner and
+// quit instructions.
 func TestAppModelView(t *testing.T) {
 	m := NewAppModel()
 	view := m.View()
@@ -37,6 +45,8 @@ func TestAppModelView(t *testing.T) {
 	}
 }
 
+// TestAppModelViewQuitting verifies the view shows a goodbye message
+// after the user presses 'q'.
 func TestAppModelViewQuitting(t *testing.T) {
 	m := NewAppModel()
 
@@ -54,6 +64,8 @@ func TestAppModelViewQuitting(t *testing.T) {
 	}
 }
 
+// TestAppModelUpdateQuit is a table-driven test verifying that 'q' and
+// ctrl+c produce tea.Quit while other keys are no-ops.
 func TestAppModelUpdateQuit(t *testing.T) {
 	tests := []struct {
 		name string
@@ -96,6 +108,8 @@ func TestAppModelUpdateQuit(t *testing.T) {
 	}
 }
 
+// TestAppModelUpdateWindowSize verifies that WindowSizeMsg updates the
+// model's dimensions without producing a command.
 func TestAppModelUpdateWindowSize(t *testing.T) {
 	m := NewAppModel()
 
@@ -113,6 +127,8 @@ func TestAppModelUpdateWindowSize(t *testing.T) {
 	}
 }
 
+// TestAppModelUnhandledMsg verifies that unrecognized message types
+// are silently ignored.
 func TestAppModelUnhandledMsg(t *testing.T) {
 	m := NewAppModel()
 

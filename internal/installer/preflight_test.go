@@ -1,3 +1,7 @@
+// preflight_test.go contains tests for the preflight check logic.
+// Since the actual PreflightCheck methods call real system functions
+// (DetectOS, CommandExists), these tests verify structure on the host
+// OS and simulate decision logic using injected dependencies.
 package installer
 
 import (
@@ -6,28 +10,34 @@ import (
 	"testing"
 )
 
+// ubuntuReader returns fake os-release content for Ubuntu 24.04.
 func ubuntuReader(_ string) ([]byte, error) {
 	return []byte(`ID=ubuntu
 VERSION_ID="24.04"
 PRETTY_NAME="Ubuntu 24.04 LTS"`), nil
 }
 
+// debianReader returns fake os-release content for Debian 12.
 func debianReader(_ string) ([]byte, error) {
 	return []byte(`ID=debian
 VERSION_ID="12"
 PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"`), nil
 }
 
+// centosReader returns fake os-release content for CentOS Stream 9.
 func centosReader(_ string) ([]byte, error) {
 	return []byte(`ID=centos
 VERSION_ID="9"
 PRETTY_NAME="CentOS Stream 9"`), nil
 }
 
+// foundLookPath simulates all commands being found on PATH.
 func foundLookPath(name string) (string, error) {
 	return "/usr/bin/" + name, nil
 }
 
+// missingLookPath returns a LookPathFunc that reports the specified
+// commands as missing and all others as found.
 func missingLookPath(cmds ...string) LookPathFunc {
 	missing := make(map[string]bool)
 	for _, c := range cmds {
@@ -50,6 +60,8 @@ func missingLookPath(cmds ...string) LookPathFunc {
 // For now, we test the detectable logic indirectly through DetectOSWith and
 // CommandExistsWith, and verify the preflight check structure.
 
+// TestPortalPreflightCheckStructure verifies the Customer Portal preflight
+// returns OS info and fails on non-Ubuntu systems.
 func TestPortalPreflightCheckStructure(t *testing.T) {
 	p := NewPortalInstaller()
 	ctx := context.Background()
@@ -73,6 +85,8 @@ func TestPortalPreflightCheckStructure(t *testing.T) {
 	}
 }
 
+// TestNetflowPreflightCheckStructure verifies the Netflow preflight
+// returns OS info and accepts Ubuntu or Debian.
 func TestNetflowPreflightCheckStructure(t *testing.T) {
 	n := NewNetflowInstaller()
 	ctx := context.Background()
@@ -92,6 +106,8 @@ func TestNetflowPreflightCheckStructure(t *testing.T) {
 	}
 }
 
+// TestFreeRADIUSPreflightCheckStructure verifies the FreeRADIUS preflight
+// returns OS info on the current host.
 func TestFreeRADIUSPreflightCheckStructure(t *testing.T) {
 	f := NewFreeRADIUSInstaller()
 	ctx := context.Background()
@@ -106,6 +122,8 @@ func TestFreeRADIUSPreflightCheckStructure(t *testing.T) {
 	}
 }
 
+// TestPollerPreflightCheckStructure verifies the Poller preflight
+// returns OS info on the current host.
 func TestPollerPreflightCheckStructure(t *testing.T) {
 	p := NewPollerInstaller()
 	ctx := context.Background()
@@ -123,6 +141,8 @@ func TestPollerPreflightCheckStructure(t *testing.T) {
 // --- Simulated Preflight Logic Tests ---
 // These test the decision logic that PreflightCheck uses, with injected dependencies.
 
+// TestPreflightOSDecisions tests the OS acceptance logic used by
+// preflight checks, exercising ubuntu-only and ubuntu-or-debian rules.
 func TestPreflightOSDecisions(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -178,6 +198,8 @@ func TestPreflightOSDecisions(t *testing.T) {
 	}
 }
 
+// TestPreflightCommandDecisions tests command-existence checks with
+// injected LookPathFunc, covering all-found, partial, and all-missing.
 func TestPreflightCommandDecisions(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -222,6 +244,8 @@ func TestPreflightCommandDecisions(t *testing.T) {
 
 // --- Verify Tests ---
 
+// TestVerifyMethodsReturnNil confirms all Verify stubs return nil
+// until real verification logic is implemented.
 func TestVerifyMethodsReturnNil(t *testing.T) {
 	// All Verify() implementations are stubs returning nil for now.
 	ctx := context.Background()

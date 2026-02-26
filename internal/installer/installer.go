@@ -17,29 +17,38 @@ type Step struct {
 	Action func(ctx context.Context, cfg *Config, output io.Writer) error
 }
 
-// Config holds the configuration values collected from the user.
+// Config holds the configuration values collected from the user
+// during the interactive TUI wizard before installation begins.
 type Config struct {
-	// Common fields
+	// SonarURL is the base URL of the Sonar instance (e.g., "https://myisp.sonar.software").
 	SonarURL string
+	// APIToken is the Sonar API bearer token for authenticated requests.
 	APIToken string
 
-	// Customer Portal specific
+	// APIUsername is the Sonar API username (Customer Portal only).
 	APIUsername string
+	// APIPassword is the Sonar API password (Customer Portal only).
 	APIPassword string
-	Domain      string
-	Email       string
+	// Domain is the FQDN where the portal will be served (Customer Portal only).
+	Domain string
+	// Email is the admin contact email for TLS certificates (Customer Portal only).
+	Email string
 
-	// Netflow specific
+	// NetflowName is the collector display name in Sonar (Netflow only).
 	NetflowName string
-	PublicIP    string
-	DBPassword  string
-	MaxLife     string
-	MaxSize     string
+	// PublicIP is the server's public IP for flow data ingestion (Netflow only).
+	PublicIP string
+	// DBPassword is the database password for the Netflow backend (Netflow only).
+	DBPassword string
+	// MaxLife is the maximum retention period for flow data (Netflow only).
+	MaxLife string
+	// MaxSize is the maximum disk size for flow data storage (Netflow only).
+	MaxSize string
 
-	// Poller specific
+	// PollerAPIKey is the Sonar API key used by the Poller agent (Poller only).
 	PollerAPIKey string
 
-	// Extra holds any additional key-value pairs.
+	// Extra holds any additional key-value pairs for future or custom config.
 	Extra map[string]string
 }
 
@@ -57,12 +66,18 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// PreflightResult contains the results of preflight checks.
+// PreflightResult contains the results of preflight checks run
+// before installation to verify system compatibility.
 type PreflightResult struct {
-	Passed   bool
-	OS       string
-	Version  string
-	Errors   []string
+	// Passed is true if all checks succeeded and installation can proceed.
+	Passed bool
+	// OS is the detected operating system ID (e.g., "ubuntu").
+	OS string
+	// Version is the detected OS version (e.g., "24.04").
+	Version string
+	// Errors lists blocking issues that prevent installation.
+	Errors []string
+	// Warnings lists non-blocking issues the user should know about.
 	Warnings []string
 }
 
@@ -177,12 +192,16 @@ func CommandExistsWith(name string, lookPath LookPathFunc) bool {
 // Registry maps application identifiers to their installer constructors.
 type Registry map[string]func() Installer
 
-// AppID constants for the supported applications.
+// AppID constants identify each supported Sonar application.
 const (
+	// AppCustomerPortal is the registry key for the Customer Portal installer.
 	AppCustomerPortal = "customer-portal"
-	AppNetflowOnPrem  = "netflow-onprem"
-	AppFreeRADIUS     = "freeradius-genie"
-	AppPoller         = "poller"
+	// AppNetflowOnPrem is the registry key for the Netflow On-Prem installer.
+	AppNetflowOnPrem = "netflow-onprem"
+	// AppFreeRADIUS is the registry key for the FreeRADIUS Genie installer.
+	AppFreeRADIUS = "freeradius-genie"
+	// AppPoller is the registry key for the Poller installer.
+	AppPoller = "poller"
 )
 
 // NewRegistry returns a registry with all supported installers.

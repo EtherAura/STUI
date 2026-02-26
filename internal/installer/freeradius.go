@@ -1,3 +1,7 @@
+// freeradius.go implements the FreeRADIUS Genie v3 installer.
+// FreeRADIUS Genie is a native (PHP-based) tool that installs and
+// configures FreeRADIUS for use with Sonar's RADIUS integration.
+// Repo: https://github.com/SonarSoftwareInc/freeradius_genie-v3
 package installer
 
 import (
@@ -14,11 +18,16 @@ func NewFreeRADIUSInstaller() *FreeRADIUSInstaller {
 	return &FreeRADIUSInstaller{}
 }
 
+// Name returns the display name for FreeRADIUS Genie v3.
 func (f *FreeRADIUSInstaller) Name() string { return "FreeRADIUS Genie v3" }
+
+// Description returns a short summary of what FreeRADIUS Genie does.
 func (f *FreeRADIUSInstaller) Description() string {
 	return "FreeRADIUS installer and configurator for Sonar"
 }
 
+// PreflightCheck verifies the host meets FreeRADIUS requirements:
+// Ubuntu OS, git available, and root access.
 func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
 
@@ -46,6 +55,7 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 	return result, nil
 }
 
+// Steps returns the ordered installation steps for FreeRADIUS Genie.
 func (f *FreeRADIUSInstaller) Steps() []Step {
 	return []Step{
 		{Name: "Clone repository", Action: f.cloneRepo},
@@ -54,6 +64,8 @@ func (f *FreeRADIUSInstaller) Steps() []Step {
 	}
 }
 
+// Install runs the full FreeRADIUS Genie installation. It validates
+// the config, then executes each step sequentially.
 func (f *FreeRADIUSInstaller) Install(ctx context.Context, cfg *Config, output io.Writer) error {
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
@@ -68,21 +80,26 @@ func (f *FreeRADIUSInstaller) Install(ctx context.Context, cfg *Config, output i
 	return nil
 }
 
+// Verify checks that FreeRADIUS Genie installed successfully.
 func (f *FreeRADIUSInstaller) Verify(ctx context.Context) error {
 	// TODO: Check freeradius service is running
 	return nil
 }
 
+// cloneRepo clones the freeradius_genie-v3 repository from GitHub.
 func (f *FreeRADIUSInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: git clone https://github.com/SonarSoftwareInc/freeradius_genie-v3.git
 	return nil
 }
 
+// configureEnv creates the .env file from .env.example and populates
+// it with user-supplied values for the FreeRADIUS configuration.
 func (f *FreeRADIUSInstaller) configureEnv(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: copy .env.example to .env and populate
 	return nil
 }
 
+// runGenie executes the genie CLI to complete FreeRADIUS setup.
 func (f *FreeRADIUSInstaller) runGenie(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: ./genie
 	return nil

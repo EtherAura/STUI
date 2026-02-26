@@ -1,3 +1,7 @@
+// portal.go implements the Customer Portal installer.
+// The Customer Portal is a Docker-based, prebuilt web portal that
+// ISPs deploy to let their subscribers manage their own accounts.
+// Repo: https://github.com/SonarSoftwareInc/customer_portal
 package installer
 
 import (
@@ -14,11 +18,16 @@ func NewPortalInstaller() *PortalInstaller {
 	return &PortalInstaller{}
 }
 
+// Name returns the display name for the Customer Portal.
 func (p *PortalInstaller) Name() string { return "Customer Portal" }
+
+// Description returns a short summary of what the Customer Portal does.
 func (p *PortalInstaller) Description() string {
 	return "A prebuilt customer portal for Sonar (Docker-based)"
 }
 
+// PreflightCheck verifies the host meets Customer Portal requirements:
+// Ubuntu OS, git and curl available, and root access.
 func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
 
@@ -51,6 +60,7 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	return result, nil
 }
 
+// Steps returns the ordered installation steps for the Customer Portal.
 func (p *PortalInstaller) Steps() []Step {
 	return []Step{
 		{Name: "Install prerequisites", Action: p.installPrereqs},
@@ -59,6 +69,8 @@ func (p *PortalInstaller) Steps() []Step {
 	}
 }
 
+// Install runs the full Customer Portal installation. It validates the
+// config (requires Domain), then executes each step sequentially.
 func (p *PortalInstaller) Install(ctx context.Context, cfg *Config, output io.Writer) error {
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
@@ -76,21 +88,25 @@ func (p *PortalInstaller) Install(ctx context.Context, cfg *Config, output io.Wr
 	return nil
 }
 
+// Verify checks that the Customer Portal installed successfully.
 func (p *PortalInstaller) Verify(ctx context.Context) error {
 	// TODO: Check that Docker containers are running
 	return nil
 }
 
+// installPrereqs installs system packages needed by the portal (git, unzip).
 func (p *PortalInstaller) installPrereqs(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: apt-get install git unzip
 	return nil
 }
 
+// cloneRepo clones the customer_portal repository from GitHub.
 func (p *PortalInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: git clone https://github.com/SonarSoftwareInc/customer_portal.git
 	return nil
 }
 
+// runInstall executes the portal's Docker-based install script.
 func (p *PortalInstaller) runInstall(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: sudo ./install.sh
 	return nil

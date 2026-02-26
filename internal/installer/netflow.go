@@ -1,3 +1,7 @@
+// netflow.go implements the Netflow On-Prem installer.
+// Netflow On-Prem is a Docker-based flow data processor that receives
+// NetFlow/sFlow data and forwards it to Sonar for network monitoring.
+// Repo: https://github.com/SonarSoftwareInc/netflow-onprem
 package installer
 
 import (
@@ -14,9 +18,14 @@ func NewNetflowInstaller() *NetflowInstaller {
 	return &NetflowInstaller{}
 }
 
-func (n *NetflowInstaller) Name() string        { return "Netflow On-Prem" }
+// Name returns the display name for Netflow On-Prem.
+func (n *NetflowInstaller) Name() string { return "Netflow On-Prem" }
+
+// Description returns a short summary of what Netflow On-Prem does.
 func (n *NetflowInstaller) Description() string { return "Netflow on-premise processor (Docker-based)" }
 
+// PreflightCheck verifies the host meets Netflow requirements:
+// Ubuntu or Debian OS, git/make/unzip available, and root access.
 func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
 
@@ -46,6 +55,7 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 	return result, nil
 }
 
+// Steps returns the ordered installation steps for Netflow On-Prem.
 func (n *NetflowInstaller) Steps() []Step {
 	return []Step{
 		{Name: "Install prerequisites", Action: n.installPrereqs},
@@ -55,6 +65,8 @@ func (n *NetflowInstaller) Steps() []Step {
 	}
 }
 
+// Install runs the full Netflow On-Prem installation. It validates the
+// config (requires APIToken and PublicIP), then executes each step.
 func (n *NetflowInstaller) Install(ctx context.Context, cfg *Config, output io.Writer) error {
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
@@ -75,26 +87,32 @@ func (n *NetflowInstaller) Install(ctx context.Context, cfg *Config, output io.W
 	return nil
 }
 
+// Verify checks that Netflow On-Prem installed successfully.
 func (n *NetflowInstaller) Verify(ctx context.Context) error {
 	// TODO: Check Docker containers are running
 	return nil
 }
 
+// installPrereqs installs system packages needed by netflow (git, make, unzip).
 func (n *NetflowInstaller) installPrereqs(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: apt-get install git make unzip
 	return nil
 }
 
+// cloneRepo clones the netflow-onprem repository from GitHub.
 func (n *NetflowInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: git clone https://github.com/SonarSoftwareInc/netflow-onprem.git
 	return nil
 }
 
+// configureEnv creates the .env file from .env.example and populates
+// it with user-supplied values (API token, public IP, etc.).
 func (n *NetflowInstaller) configureEnv(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: copy .env.example to .env and populate values
 	return nil
 }
 
+// runInstall executes the netflow Docker-based install script.
 func (n *NetflowInstaller) runInstall(ctx context.Context, cfg *Config, output io.Writer) error {
 	// TODO: chmod +x ./install.sh && sudo ./install.sh
 	return nil

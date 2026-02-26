@@ -10,10 +10,12 @@ import (
 
 // Styles used across the TUI.
 var (
+	// BannerStyle renders the application title in bold purple.
 	BannerStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#7D56F4"))
 
+	// HelpStyle renders help text in muted gray.
 	HelpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#626262"))
 )
