@@ -26,6 +26,15 @@ func (p *PortalInstaller) Description() string {
 	return "A prebuilt customer portal for Sonar (Docker-based)"
 }
 
+// Requirements returns the system requirements for the Customer Portal.
+func (p *PortalInstaller) Requirements() []string {
+	return []string{
+		"OS: Ubuntu (recommended)",
+		"Commands: git, curl",
+		"Privileges: root / sudo",
+	}
+}
+
 // PreflightCheck verifies the host meets Customer Portal requirements:
 // Ubuntu OS, git and curl available, and root access.
 func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {

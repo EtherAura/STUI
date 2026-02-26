@@ -24,6 +24,15 @@ func (n *NetflowInstaller) Name() string { return "Netflow On-Prem" }
 // Description returns a short summary of what Netflow On-Prem does.
 func (n *NetflowInstaller) Description() string { return "Netflow on-premise processor (Docker-based)" }
 
+// Requirements returns the system requirements for Netflow On-Prem.
+func (n *NetflowInstaller) Requirements() []string {
+	return []string{
+		"OS: Ubuntu or Debian (recommended)",
+		"Commands: git, make, unzip",
+		"Privileges: root / sudo",
+	}
+}
+
 // PreflightCheck verifies the host meets Netflow requirements:
 // Ubuntu or Debian OS, git/make/unzip available, and root access.
 func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {

@@ -26,6 +26,15 @@ func (f *FreeRADIUSInstaller) Description() string {
 	return "FreeRADIUS installer and configurator for Sonar"
 }
 
+// Requirements returns the system requirements for FreeRADIUS Genie.
+func (f *FreeRADIUSInstaller) Requirements() []string {
+	return []string{
+		"OS: Ubuntu (recommended)",
+		"Commands: git",
+		"Privileges: root / sudo",
+	}
+}
+
 // PreflightCheck verifies the host meets FreeRADIUS requirements:
 // Ubuntu OS, git available, and root access.
 func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {

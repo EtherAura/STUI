@@ -92,6 +92,10 @@ type Installer interface {
 	// Description returns a short description of the application.
 	Description() string
 
+	// Requirements returns a human-readable list of system requirements
+	// (e.g., supported OS, required commands, root access).
+	Requirements() []string
+
 	// PreflightCheck verifies the system meets requirements.
 	PreflightCheck(ctx context.Context) (*PreflightResult, error)
 

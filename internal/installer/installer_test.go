@@ -290,6 +290,42 @@ func TestInstallerInterfaceCompliance(_ *testing.T) {
 	var _ Installer = (*PollerInstaller)(nil)
 }
 
+// TestInstallerRequirements verifies all installers return a non-empty
+// list of requirements that includes OS and privilege information.
+func TestInstallerRequirements(t *testing.T) {
+	installers := []Installer{
+		NewPortalInstaller(),
+		NewNetflowInstaller(),
+		NewFreeRADIUSInstaller(),
+		NewPollerInstaller(),
+	}
+
+	for _, inst := range installers {
+		t.Run(inst.Name(), func(t *testing.T) {
+			reqs := inst.Requirements()
+			if len(reqs) == 0 {
+				t.Error("Requirements() should not be empty")
+			}
+			hasOS := false
+			hasPriv := false
+			for _, r := range reqs {
+				if contains(r, "OS") {
+					hasOS = true
+				}
+				if contains(r, "root") || contains(r, "sudo") {
+					hasPriv = true
+				}
+			}
+			if !hasOS {
+				t.Error("Requirements should mention OS")
+			}
+			if !hasPriv {
+				t.Error("Requirements should mention privileges")
+			}
+		})
+	}
+}
+
 // TestPortalInstallValidation tests the Customer Portal install flow:
 // missing URL, missing domain, and a valid config that runs all steps.
 func TestPortalInstallValidation(t *testing.T) {

@@ -24,6 +24,14 @@ func (p *PollerInstaller) Name() string { return "Poller" }
 // Description returns a short summary of what the Poller does.
 func (p *PollerInstaller) Description() string { return "Network monitoring poller for Sonar" }
 
+// Requirements returns the system requirements for the Poller.
+func (p *PollerInstaller) Requirements() []string {
+	return []string{
+		"OS: Ubuntu (recommended)",
+		"Privileges: root / sudo",
+	}
+}
+
 // PreflightCheck verifies the host meets Poller requirements:
 // Ubuntu OS and root access.
 func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {

@@ -113,6 +113,51 @@ func TestPreflightViewRunning(t *testing.T) {
 	}
 }
 
+// TestPreflightViewRequirements verifies the requirements section is
+// displayed for the selected application.
+func TestPreflightViewRequirements(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:  true,
+		OS:      "ubuntu",
+		Version: "24.04",
+	}})
+	view := m.View()
+
+	if !strings.Contains(view, "Requirements") {
+		t.Error("view should contain Requirements heading")
+	}
+	if !strings.Contains(view, "Ubuntu") {
+		t.Error("view should list OS requirement")
+	}
+	if !strings.Contains(view, "git") {
+		t.Error("view should list required commands")
+	}
+}
+
+// TestPreflightViewIconAlignment verifies that status icons use
+// consistent spacing for visual alignment.
+func TestPreflightViewIconAlignment(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:   true,
+		OS:       "ubuntu",
+		Version:  "24.04",
+		Warnings: []string{"test warning"},
+	}})
+	view := m.View()
+
+	// Both ✓ and ⚠ should have double-space after the icon.
+	if !strings.Contains(view, "✓  ") {
+		t.Error("pass icon should have double-space after it")
+	}
+	if !strings.Contains(view, "⚠  ") {
+		t.Error("warning icon should have double-space after it")
+	}
+}
+
 // TestPreflightViewPassed verifies the passed view shows success indicators.
 func TestPreflightViewPassed(t *testing.T) {
 	reg := installer.NewRegistry()
