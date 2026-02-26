@@ -1,16 +1,29 @@
 # Usage
 
+> **Note:** STUI is not yet published. For now, build from source — see [Development](development.md).
+
 ## Installing STUI
 
-STUI is distributed as a single static binary. Install it with one command:
+### Building from Source (current)
+
+```bash
+git clone https://github.com/EtherAura/stui.git
+cd stui
+go build -o stui ./cmd/stui
+sudo mv stui /usr/local/bin/
+```
+
+### One-Line Install (future)
+
+Once published, STUI will be installable with a single command:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/EtherAura/stui/main/scripts/install.sh | sudo bash
 ```
 
-This detects your architecture, downloads the correct binary from GitHub Releases, and places it in `/usr/local/bin/stui`.
+This will detect your architecture, download the correct binary from GitHub Releases, and place it in `/usr/local/bin/stui`.
 
-### Manual Install
+### Manual Install (future)
 
 Download a release binary directly from [GitHub Releases](https://github.com/EtherAura/stui/releases), extract it, and move it to a directory on your PATH:
 

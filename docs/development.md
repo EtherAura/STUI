@@ -2,13 +2,20 @@
 
 ## Prerequisites
 
-- Go 1.21+
+- Go 1.25+ (`go version` to check)
 - git
+- golangci-lint (`go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`)
 
 ## Building
 
 ```bash
 go build -o stui ./cmd/stui
+```
+
+This produces a `./stui` binary in the project root. You can also run without building:
+
+```bash
+go run ./cmd/stui
 ```
 
 ## Running
@@ -19,9 +26,32 @@ go build -o stui ./cmd/stui
 
 ## Testing
 
+Run all tests:
+
 ```bash
 go test ./...
 ```
+
+Run with verbose output:
+
+```bash
+go test ./... -v
+```
+
+Generate a coverage report:
+
+```bash
+go test ./... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+```
+
+## Linting
+
+```bash
+golangci-lint run ./...
+```
+
+Configuration lives in `.golangci.yml` at the project root.
 
 ## Project Structure
 
@@ -49,5 +79,6 @@ Releases are built via GoReleaser and published to GitHub Releases. The `scripts
 ## Code Style
 
 - Run `gofmt` before committing
-- Use `golangci-lint` for additional checks
-- Wrap errors with context: `fmt.Errorf("doing X: %w", err)`
+- Use `golangci-lint run ./...` for additional checks
+- Wrap errors with context: `fmt.Errorf("doing X: %%w", err)`
+- Follow the **Comment Standards** in `.github/copilot-instructions.md` — every function, type, and file must be commented
