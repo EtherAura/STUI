@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/SonarSoftwareInc/stui/internal/tui"
+	"github.com/EtherAura/stui/internal/tui"
 )
 
 // main initializes and runs the Bubble Tea TUI program.

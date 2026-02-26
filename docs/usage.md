@@ -5,14 +5,14 @@
 STUI is distributed as a single static binary. Install it with one command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/SonarSoftwareInc/stui/main/scripts/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/EtherAura/stui/main/scripts/install.sh | sudo bash
 ```
 
 This detects your architecture, downloads the correct binary from GitHub Releases, and places it in `/usr/local/bin/stui`.
 
 ### Manual Install
 
-Download a release binary directly from [GitHub Releases](https://github.com/SonarSoftwareInc/stui/releases), extract it, and move it to a directory on your PATH:
+Download a release binary directly from [GitHub Releases](https://github.com/EtherAura/stui/releases), extract it, and move it to a directory on your PATH:
 
 ```bash
 tar xzf stui_linux_amd64.tar.gz

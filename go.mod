@@ -1,4 +1,4 @@
-module github.com/SonarSoftwareInc/stui
+module github.com/EtherAura/stui
 
 go 1.25.5
 
