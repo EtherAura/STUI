@@ -64,7 +64,7 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	// Check root — flag for sudo relaunch option.
 	if !IsRoot() {
 		result.NeedsRoot = true
-		result.Warnings = append(result.Warnings, "not running as root; sudo will be required")
+		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 
 	return result, nil

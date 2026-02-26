@@ -393,7 +393,7 @@ func TestPreflightViewNeedsRoot(t *testing.T) {
 		Passed:    true,
 		OS:        "ubuntu",
 		NeedsRoot: true,
-		Warnings:  []string{"not running as root; sudo will be required"},
+		Warnings:  []string{"not running as root; elevated privileges are required"},
 	}})
 	view := m.View()
 
