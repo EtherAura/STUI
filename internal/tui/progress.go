@@ -56,6 +56,8 @@ type ProgressModel struct {
 	inst installer.Installer
 	// cfg holds the user-provided configuration.
 	cfg *installer.Config
+	// ctx is the cancellable context for the installation.
+	ctx context.Context
 	// spinner provides visual feedback while installing.
 	spinner spinner.Model
 	// progress is the progress bar component.
@@ -82,8 +84,9 @@ type ProgressModel struct {
 }
 
 // NewProgressModel creates a progress screen for the given app
-// with the provided configuration.
-func NewProgressModel(reg installer.Registry, appID string, cfg *installer.Config) ProgressModel {
+// with the provided configuration. The context allows the caller
+// to cancel the installation on navigation or quit.
+func NewProgressModel(ctx context.Context, reg installer.Registry, appID string, cfg *installer.Config) ProgressModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = BannerStyle
@@ -104,6 +107,7 @@ func NewProgressModel(reg installer.Registry, appID string, cfg *installer.Confi
 		appID:      appID,
 		inst:       inst,
 		cfg:        cfg,
+		ctx:        ctx,
 		spinner:    s,
 		progress:   p,
 		viewport:   vp,
@@ -128,6 +132,7 @@ func (m ProgressModel) runInstall() tea.Cmd {
 	inst := m.inst
 	cfg := m.cfg
 	appID := m.appID
+	ctx := m.ctx
 	return func() tea.Msg {
 		if inst == nil {
 			return InstallDoneMsg{Err: fmt.Errorf("no installer for app %q", appID)}
@@ -136,7 +141,6 @@ func (m ProgressModel) runInstall() tea.Cmd {
 		// Use a buffer to capture output. In a full implementation,
 		// this would stream via a pipe with goroutine forwarding.
 		var buf bytes.Buffer
-		ctx := context.Background()
 		err := inst.Install(ctx, cfg, &buf)
 
 		// Send the final output and done message.

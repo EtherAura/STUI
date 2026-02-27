@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ import (
 // the running state with the correct app ID.
 func TestNewPreflightModel(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	if m.AppID() != installer.AppCustomerPortal {
 		t.Errorf("AppID() = %q, want %q", m.AppID(), installer.AppCustomerPortal)
@@ -32,7 +33,7 @@ func TestNewPreflightModel(t *testing.T) {
 // TestNewPreflightModelUnknown verifies handling of an unknown app ID.
 func TestNewPreflightModelUnknown(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, "unknown-app")
+	m := NewPreflightModel(context.Background(), reg, "unknown-app")
 
 	if m.inst != nil {
 		t.Error("installer should be nil for unknown app")
@@ -42,7 +43,7 @@ func TestNewPreflightModelUnknown(t *testing.T) {
 // TestPreflightModelInit verifies Init returns commands (spinner + check).
 func TestPreflightModelInit(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	cmd := m.Init()
 	if cmd == nil {
 		t.Error("Init() should return a batch command")
@@ -53,7 +54,7 @@ func TestPreflightModelInit(t *testing.T) {
 // spinner and stores the result.
 func TestPreflightModelDoneMsg(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	result := &installer.PreflightResult{
 		Passed:  true,
@@ -78,7 +79,7 @@ func TestPreflightModelDoneMsg(t *testing.T) {
 // preflight check itself fails.
 func TestPreflightModelDoneMsgError(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	m, _ = m.Update(PreflightDoneMsg{Err: errTestPreflight})
 
@@ -102,7 +103,7 @@ func (e *testError) Error() string { return e.msg }
 // TestPreflightViewRunning verifies the running view shows a spinner.
 func TestPreflightViewRunning(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	view := m.View()
 
 	if !strings.Contains(view, "Running") {
@@ -117,7 +118,7 @@ func TestPreflightViewRunning(t *testing.T) {
 // not shown on the preflight screen (they moved to the detail screen).
 func TestPreflightViewNoRequirements(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:  true,
 		OS:      "ubuntu",
@@ -134,7 +135,7 @@ func TestPreflightViewNoRequirements(t *testing.T) {
 // consistent spacing for visual alignment.
 func TestPreflightViewIconAlignment(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:   true,
 		OS:       "ubuntu",
@@ -155,7 +156,7 @@ func TestPreflightViewIconAlignment(t *testing.T) {
 // TestPreflightViewPassed verifies the passed view shows success indicators.
 func TestPreflightViewPassed(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:  true,
 		OS:      "ubuntu",
@@ -177,7 +178,7 @@ func TestPreflightViewPassed(t *testing.T) {
 // TestPreflightViewFailed verifies the failed view shows error details.
 func TestPreflightViewFailed(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed: false,
 		OS:     "ubuntu",
@@ -196,7 +197,7 @@ func TestPreflightViewFailed(t *testing.T) {
 // TestPreflightViewWarnings verifies warnings are displayed.
 func TestPreflightViewWarnings(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:   true,
 		OS:       "ubuntu",
@@ -220,7 +221,7 @@ func TestPreflightViewWarnings(t *testing.T) {
 // lines appear with success indicators when specs meet requirements.
 func TestPreflightViewHardwareChecksPass(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:  true,
 		OS:      "ubuntu",
@@ -256,7 +257,7 @@ func TestPreflightViewHardwareChecksPass(t *testing.T) {
 // lines appear with warning indicators when specs are below requirements.
 func TestPreflightViewHardwareChecksFail(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:  true,
 		OS:      "ubuntu",
@@ -291,7 +292,7 @@ func TestPreflightViewHardwareChecksFail(t *testing.T) {
 // TestPreflightViewError verifies the error view when the check fails to run.
 func TestPreflightViewError(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Err: errTestPreflight})
 	view := m.View()
 
@@ -304,7 +305,7 @@ func TestPreflightViewError(t *testing.T) {
 // when checks passed.
 func TestPreflightEnterOnPassed(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed: true,
 	}})
@@ -327,7 +328,7 @@ func TestPreflightEnterOnPassed(t *testing.T) {
 // TestPreflightEnterOnFailed verifies enter does nothing when checks failed.
 func TestPreflightEnterOnFailed(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed: false,
 	}})
@@ -341,7 +342,7 @@ func TestPreflightEnterOnFailed(t *testing.T) {
 // TestPreflightEnterWhileRunning verifies enter is ignored while running.
 func TestPreflightEnterWhileRunning(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd != nil {
@@ -352,7 +353,7 @@ func TestPreflightEnterWhileRunning(t *testing.T) {
 // TestPreflightEscKey verifies esc goes back to menu.
 func TestPreflightEscKey(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{Passed: true}})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
@@ -370,7 +371,7 @@ func TestPreflightEscKey(t *testing.T) {
 // TestPreflightWindowResize verifies WindowSizeMsg updates dimensions.
 func TestPreflightWindowResize(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	if m.width != 80 || m.height != 24 {
@@ -420,7 +421,7 @@ func TestAppModelPreflightBackToMenu(t *testing.T) {
 // ElevateMsg when preflight reports NeedsRoot with a detected escalation.
 func TestPreflightElevateKeyOnNeedsRoot(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:     true,
@@ -451,7 +452,7 @@ func TestPreflightElevateKeyOnNeedsRoot(t *testing.T) {
 // when NeedsRoot is false.
 func TestPreflightElevateKeyIgnoredWhenRoot(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:    true,
 		OS:        "ubuntu",
@@ -468,7 +469,7 @@ func TestPreflightElevateKeyIgnoredWhenRoot(t *testing.T) {
 // option when NeedsRoot is set with a detected escalation method.
 func TestPreflightViewNeedsRoot(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:     true,
@@ -491,7 +492,7 @@ func TestPreflightViewNeedsRoot(t *testing.T) {
 // an escalation option when NeedsRoot is false.
 func TestPreflightViewNoEscalationWhenRoot(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
 		Passed:    true,
 		OS:        "ubuntu",

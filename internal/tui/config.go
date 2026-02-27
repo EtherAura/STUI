@@ -33,6 +33,8 @@ type configField struct {
 	placeholder string
 	// required marks the field as mandatory.
 	required bool
+	// secret marks the field as sensitive; input is masked.
+	secret bool
 }
 
 // appConfigFields maps each app ID to its required/optional config fields.
@@ -41,23 +43,23 @@ var appConfigFields = map[string][]configField{
 	installer.AppCustomerPortal: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
 		{key: "api_username", label: "API Username", placeholder: "admin", required: true},
-		{key: "api_password", label: "API Password", placeholder: "password", required: true},
+		{key: "api_password", label: "API Password", placeholder: "password", required: true, secret: true},
 		{key: "domain", label: "Portal Domain", placeholder: "portal.example.com", required: true},
 		{key: "email", label: "Admin Email (for TLS)", placeholder: "admin@example.com", required: true},
 	},
 	installer.AppNetflowOnPrem: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
-		{key: "api_token", label: "API Token", placeholder: "bearer token", required: true},
+		{key: "api_token", label: "API Token", placeholder: "bearer token", required: true, secret: true},
 		{key: "netflow_name", label: "Collector Name", placeholder: "netflow-collector-1", required: false},
 		{key: "public_ip", label: "Public IP Address", placeholder: "203.0.113.1", required: true},
-		{key: "db_password", label: "Database Password", placeholder: "secure-password", required: false},
+		{key: "db_password", label: "Database Password", placeholder: "secure-password", required: false, secret: true},
 	},
 	installer.AppFreeRADIUS: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
 	},
 	installer.AppPoller: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
-		{key: "poller_api_key", label: "Poller API Key", placeholder: "sonar-api-key", required: true},
+		{key: "poller_api_key", label: "Poller API Key", placeholder: "sonar-api-key", required: true, secret: true},
 	},
 }
 
@@ -93,6 +95,10 @@ func NewConfigModel(appID string) ConfigModel {
 		ti.Placeholder = f.placeholder
 		ti.CharLimit = 256
 		ti.Width = 40
+		if f.secret {
+			ti.EchoMode = textinput.EchoPassword
+			ti.EchoCharacter = '•'
+		}
 		if i == 0 {
 			ti.Focus()
 		}
@@ -173,6 +179,14 @@ func (m ConfigModel) submit() (ConfigModel, tea.Cmd) {
 	}
 
 	cfg := m.buildConfig()
+
+	// Run app-specific validation (URL format, required combos, etc.)
+	// so errors surface before the install screen, not mid-install.
+	if err := cfg.ValidateForApp(m.appID); err != nil {
+		m.err = err.Error()
+		return m, nil
+	}
+
 	return m, func() tea.Msg {
 		return ConfigDoneMsg{AppID: m.appID, Config: cfg}
 	}

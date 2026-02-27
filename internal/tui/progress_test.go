@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func newTestConfig() *installer.Config {
 func TestNewProgressModel(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 
 	if m.AppID() != installer.AppCustomerPortal {
 		t.Errorf("AppID() = %q, want %q", m.AppID(), installer.AppCustomerPortal)
@@ -45,7 +46,7 @@ func TestNewProgressModel(t *testing.T) {
 func TestNewProgressModelUnknown(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, "unknown-app", cfg)
+	m := NewProgressModel(context.Background(), reg, "unknown-app", cfg)
 
 	if m.inst != nil {
 		t.Error("installer should be nil for unknown app")
@@ -59,7 +60,7 @@ func TestNewProgressModelUnknown(t *testing.T) {
 func TestProgressModelInit(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 	cmd := m.Init()
 	if cmd == nil {
 		t.Error("Init() should return a batch command")
@@ -70,7 +71,7 @@ func TestProgressModelInit(t *testing.T) {
 func TestProgressModelOutputMsg(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 
 	m, _ = m.Update(InstallOutputMsg{Output: "line 1\n"})
 	m, _ = m.Update(InstallOutputMsg{Output: "line 2\n"})
@@ -87,7 +88,7 @@ func TestProgressModelOutputMsg(t *testing.T) {
 func TestProgressModelStepMsg(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 
 	m, _ = m.Update(InstallStepMsg{StepIndex: 1, StepName: "Clone repo", TotalSteps: 3})
 
@@ -103,7 +104,7 @@ func TestProgressModelStepMsg(t *testing.T) {
 func TestProgressModelDoneSuccess(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 
 	m, _ = m.Update(InstallDoneMsg{Err: nil})
 
@@ -125,7 +126,7 @@ func TestProgressModelDoneSuccess(t *testing.T) {
 func TestProgressModelDoneError(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 
 	m, _ = m.Update(InstallDoneMsg{Err: errTestPreflight})
 
@@ -145,7 +146,7 @@ func TestProgressModelDoneError(t *testing.T) {
 func TestProgressModelEnterOnSuccess(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 	m, _ = m.Update(InstallDoneMsg{Err: nil})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -166,7 +167,7 @@ func TestProgressModelEnterOnSuccess(t *testing.T) {
 func TestProgressModelEnterOnError(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 	m, _ = m.Update(InstallDoneMsg{Err: errTestPreflight})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -179,7 +180,7 @@ func TestProgressModelEnterOnError(t *testing.T) {
 func TestProgressModelEscOnDone(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 	m, _ = m.Update(InstallDoneMsg{Err: nil})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
@@ -197,7 +198,7 @@ func TestProgressModelEscOnDone(t *testing.T) {
 func TestProgressModelWindowResize(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	if m.width != 100 || m.height != 50 {
@@ -209,7 +210,7 @@ func TestProgressModelWindowResize(t *testing.T) {
 func TestProgressModelViewRunning(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 	view := m.View()
 
 	if !strings.Contains(view, "Installing") {
@@ -221,7 +222,7 @@ func TestProgressModelViewRunning(t *testing.T) {
 func TestProgressModelViewDone(t *testing.T) {
 	reg := installer.NewRegistry()
 	cfg := newTestConfig()
-	m := NewProgressModel(reg, installer.AppCustomerPortal, cfg)
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
 	m, _ = m.Update(InstallDoneMsg{Err: nil})
 	view := m.View()
 

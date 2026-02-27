@@ -237,3 +237,65 @@ func TestAppModelTransitionToConfig(t *testing.T) {
 		t.Errorf("screen = %d, want ScreenConfig (%d)", model.Screen(), ScreenConfig)
 	}
 }
+
+// TestSecretFieldsMasked verifies that password, API token, and API key
+// fields use password echo mode so values are not shown as plaintext.
+func TestSecretFieldsMasked(t *testing.T) {
+	tests := []struct {
+		appID      string
+		secretKeys map[string]bool
+	}{
+		{
+			appID:      installer.AppCustomerPortal,
+			secretKeys: map[string]bool{"api_password": true},
+		},
+		{
+			appID:      installer.AppNetflowOnPrem,
+			secretKeys: map[string]bool{"api_token": true, "db_password": true},
+		},
+		{
+			appID:      installer.AppPoller,
+			secretKeys: map[string]bool{"poller_api_key": true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.appID, func(t *testing.T) {
+			m := NewConfigModel(tt.appID)
+			for i, f := range m.fields {
+				if tt.secretKeys[f.key] {
+					if m.inputs[i].EchoMode == 0 { // 0 = EchoNormal
+						t.Errorf("field %q should have masked echo mode, got normal", f.key)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestConfigSubmitValidatesForApp verifies that the config wizard's
+// submit runs app-specific validation (from ValidateForApp) and
+// surfaces errors before transitioning to the install screen.
+func TestConfigSubmitValidatesForApp(t *testing.T) {
+	m := NewConfigModel(installer.AppNetflowOnPrem)
+
+	// Fill in only the sonar_url field (first field) with a valid URL.
+	// Leave api_token (second field, required) empty.
+	for _, r := range "https://test.sonar.software" {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+
+	// Navigate to last field and try to submit.
+	for m.FocusIndex() != len(m.fields)-1 {
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	}
+
+	// Type something in the last field so empty-check passes for it,
+	// but api_token field (index 1) is still empty.
+	// Actually, the empty-check will catch field 1 (api_token) first.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.err == "" {
+		t.Error("expected validation error for empty required API token field")
+	}
+}

@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ import (
 // running state with the correct app ID.
 func TestNewVerifyModel(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	if m.AppID() != installer.AppCustomerPortal {
 		t.Errorf("AppID() = %q, want %q", m.AppID(), installer.AppCustomerPortal)
@@ -32,7 +33,7 @@ func TestNewVerifyModel(t *testing.T) {
 // TestNewVerifyModelUnknown verifies handling of an unknown app ID.
 func TestNewVerifyModelUnknown(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, "unknown-app")
+	m := NewVerifyModel(context.Background(), reg, "unknown-app")
 
 	if m.inst != nil {
 		t.Error("installer should be nil for unknown app")
@@ -42,7 +43,7 @@ func TestNewVerifyModelUnknown(t *testing.T) {
 // TestVerifyModelInit verifies Init returns commands.
 func TestVerifyModelInit(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	cmd := m.Init()
 	if cmd == nil {
 		t.Error("Init() should return a batch command")
@@ -52,7 +53,7 @@ func TestVerifyModelInit(t *testing.T) {
 // TestVerifyModelDoneSuccess verifies successful verification.
 func TestVerifyModelDoneSuccess(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	m, _ = m.Update(VerifyDoneMsg{Err: nil})
 
@@ -70,7 +71,7 @@ func TestVerifyModelDoneSuccess(t *testing.T) {
 // TestVerifyModelDoneError verifies error verification.
 func TestVerifyModelDoneError(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	m, _ = m.Update(VerifyDoneMsg{Err: errTestPreflight})
 
@@ -85,7 +86,7 @@ func TestVerifyModelDoneError(t *testing.T) {
 // TestVerifyViewRunning verifies the running view shows a spinner.
 func TestVerifyViewRunning(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	view := m.View()
 
 	if !strings.Contains(view, "Verifying") {
@@ -96,7 +97,7 @@ func TestVerifyViewRunning(t *testing.T) {
 // TestVerifyViewSuccess verifies the success view.
 func TestVerifyViewSuccess(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(VerifyDoneMsg{Err: nil})
 	view := m.View()
 
@@ -111,7 +112,7 @@ func TestVerifyViewSuccess(t *testing.T) {
 // TestVerifyViewError verifies the error view.
 func TestVerifyViewError(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(VerifyDoneMsg{Err: errTestPreflight})
 	view := m.View()
 
@@ -126,7 +127,7 @@ func TestVerifyViewError(t *testing.T) {
 // TestVerifyEnterReturnsToMenu verifies enter goes back to menu.
 func TestVerifyEnterReturnsToMenu(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(VerifyDoneMsg{Err: nil})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -143,7 +144,7 @@ func TestVerifyEnterReturnsToMenu(t *testing.T) {
 // TestVerifyEscReturnsToMenu verifies esc goes back to menu.
 func TestVerifyEscReturnsToMenu(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(VerifyDoneMsg{Err: nil})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
@@ -160,7 +161,7 @@ func TestVerifyEscReturnsToMenu(t *testing.T) {
 // TestVerifyQKeyReturnsToMenu verifies q goes back to menu.
 func TestVerifyQKeyReturnsToMenu(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 	m, _ = m.Update(VerifyDoneMsg{Err: nil})
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
@@ -177,7 +178,7 @@ func TestVerifyQKeyReturnsToMenu(t *testing.T) {
 // TestVerifyKeysIgnoredWhileRunning verifies keys are ignored while running.
 func TestVerifyKeysIgnoredWhileRunning(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd != nil {
@@ -188,7 +189,7 @@ func TestVerifyKeysIgnoredWhileRunning(t *testing.T) {
 // TestVerifyWindowResize verifies dimensions are updated.
 func TestVerifyWindowResize(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 50})
 	if m.width != 100 || m.height != 50 {
@@ -199,7 +200,7 @@ func TestVerifyWindowResize(t *testing.T) {
 // TestVerifyAppName verifies appName returns the installer name.
 func TestVerifyAppName(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, installer.AppCustomerPortal)
+	m := NewVerifyModel(context.Background(), reg, installer.AppCustomerPortal)
 
 	if m.appName() != "Customer Portal" {
 		t.Errorf("appName() = %q, want %q", m.appName(), "Customer Portal")
@@ -209,7 +210,7 @@ func TestVerifyAppName(t *testing.T) {
 // TestVerifyAppNameUnknown verifies appName falls back to app ID.
 func TestVerifyAppNameUnknown(t *testing.T) {
 	reg := installer.NewRegistry()
-	m := NewVerifyModel(reg, "unknown")
+	m := NewVerifyModel(context.Background(), reg, "unknown")
 
 	if m.appName() != "unknown" {
 		t.Errorf("appName() = %q, want %q", m.appName(), "unknown")

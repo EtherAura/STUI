@@ -2,6 +2,8 @@
 package tui
 
 import (
+	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/EtherAura/stui/internal/installer"
@@ -58,6 +60,9 @@ type AppModel struct {
 	settings SettingsModel
 	// help is the help screen model.
 	help HelpModel
+	// cancel cancels the context for the currently running async
+	// operation (preflight, install, verify). Nil when idle.
+	cancel context.CancelFunc
 	// quitting indicates the user has requested to quit.
 	quitting bool
 	// elevateRelaunch indicates the app should relaunch with elevated privileges.
@@ -89,11 +94,13 @@ func NewAppModel() AppModel {
 // to the installer they were viewing.
 func NewAppModelWithResume(appID string) AppModel {
 	reg := installer.NewRegistry()
+	ctx, cancel := context.WithCancel(context.Background())
 	return AppModel{
 		registry:    reg,
 		screen:      ScreenPreflight,
 		menu:        NewMenuModel(),
-		preflight:   NewPreflightModel(reg, appID),
+		preflight:   NewPreflightModel(ctx, reg, appID),
+		cancel:      cancel,
 		resumeAppID: appID,
 	}
 }
@@ -114,6 +121,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			m.cancelRunning()
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -142,6 +150,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = ScreenDetail
 		return m, nil
 	case BackToMenuMsg:
+		// Cancel any running async operation before navigating away.
+		m.cancelRunning()
 		// Return to the appropriate parent screen.
 		switch m.screen {
 		case ScreenDetail:
@@ -151,27 +161,38 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case StartPreflightMsg:
-		// Transition from detail to preflight screen.
-		m.preflight = NewPreflightModel(m.registry, msg.AppID)
+		// Cancel any prior operation and create a new context.
+		m.cancelRunning()
+		ctx, cancel := context.WithCancel(context.Background())
+		m.cancel = cancel
+		m.preflight = NewPreflightModel(ctx, m.registry, msg.AppID)
 		m.screen = ScreenPreflight
 		return m, m.preflight.Init()
 	case StartConfigMsg:
-		// Transition from preflight to config wizard.
+		// Cancel the preflight context (check is done).
+		m.cancelRunning()
 		m.config = NewConfigModel(msg.AppID)
 		m.screen = ScreenConfig
 		return m, m.config.Init()
 	case ConfigDoneMsg:
-		// Transition from config wizard to install progress.
-		m.progress = NewProgressModel(m.registry, msg.AppID, msg.Config)
+		// Create a new context for the installation.
+		m.cancelRunning()
+		ctx, cancel := context.WithCancel(context.Background())
+		m.cancel = cancel
+		m.progress = NewProgressModel(ctx, m.registry, msg.AppID, msg.Config)
 		m.screen = ScreenInstall
 		return m, m.progress.Init()
 	case StartVerifyMsg:
-		// Transition from progress to verification screen.
-		m.verify = NewVerifyModel(m.registry, msg.AppID)
+		// Create a new context for verification.
+		m.cancelRunning()
+		ctx, cancel := context.WithCancel(context.Background())
+		m.cancel = cancel
+		m.verify = NewVerifyModel(ctx, m.registry, msg.AppID)
 		m.screen = ScreenVerify
 		return m, m.verify.Init()
 	case ElevateMsg:
-		// Quit the TUI so main can relaunch with elevated privileges.
+		// Cancel running ops, quit TUI for privilege escalation.
+		m.cancelRunning()
 		m.elevateRelaunch = true
 		m.escalation = msg.Escalation
 		m.resumeAppID = msg.AppID
@@ -270,4 +291,14 @@ func (m AppModel) Screen() Screen {
 // relaunch, or an empty string if starting normally.
 func (m AppModel) ResumeAppID() string {
 	return m.resumeAppID
+}
+
+// cancelRunning cancels the context for the current async operation
+// (preflight, install, verify) if one is active, preventing orphaned
+// goroutines from continuing after the user navigates away or quits.
+func (m *AppModel) cancelRunning() {
+	if m.cancel != nil {
+		m.cancel()
+		m.cancel = nil
+	}
 }

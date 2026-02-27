@@ -5,8 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -52,7 +55,7 @@ type Config struct {
 	Extra map[string]string
 }
 
-// Validate checks that required common fields are set.
+// Validate checks that required common fields are set and well-formed.
 func (c *Config) Validate() error {
 	if c.SonarURL == "" {
 		return fmt.Errorf("sonar URL is required")
@@ -62,6 +65,102 @@ func (c *Config) Validate() error {
 	}
 	if strings.HasSuffix(c.SonarURL, "/") {
 		return fmt.Errorf("sonar URL must not have a trailing slash")
+	}
+	if err := validateURL(c.SonarURL); err != nil {
+		return fmt.Errorf("sonar URL: %w", err)
+	}
+	return nil
+}
+
+// ValidateForApp checks app-specific required fields on top of the
+// common Validate checks. This allows the config wizard to surface
+// validation errors before installation begins, rather than failing
+// mid-install.
+func (c *Config) ValidateForApp(appID string) error {
+	if err := c.Validate(); err != nil {
+		return err
+	}
+
+	switch appID {
+	case AppCustomerPortal:
+		if c.APIUsername == "" {
+			return fmt.Errorf("API username is required for Customer Portal")
+		}
+		if c.APIPassword == "" {
+			return fmt.Errorf("API password is required for Customer Portal")
+		}
+		if c.Domain == "" {
+			return fmt.Errorf("domain is required for Customer Portal")
+		}
+		if err := validateDomain(c.Domain); err != nil {
+			return fmt.Errorf("portal domain: %w", err)
+		}
+		if c.Email == "" {
+			return fmt.Errorf("admin email is required for Customer Portal")
+		}
+		if err := validateEmail(c.Email); err != nil {
+			return fmt.Errorf("admin email: %w", err)
+		}
+	case AppNetflowOnPrem:
+		if c.APIToken == "" {
+			return fmt.Errorf("API token is required for Netflow On-Prem")
+		}
+		if c.PublicIP == "" {
+			return fmt.Errorf("public IP is required for Netflow On-Prem")
+		}
+		if err := validateIP(c.PublicIP); err != nil {
+			return fmt.Errorf("public IP: %w", err)
+		}
+	case AppPoller:
+		if c.PollerAPIKey == "" {
+			return fmt.Errorf("poller API key is required for Poller")
+		}
+	}
+
+	return nil
+}
+
+// domainRegexp matches a valid FQDN (letters, digits, hyphens, dots).
+var domainRegexp = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`)
+
+// emailRegexp matches a basic email pattern: local@domain.
+var emailRegexp = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+// validateURL checks that a string is a well-formed HTTPS URL with a host.
+func validateURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return fmt.Errorf("must use https scheme")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+	return nil
+}
+
+// validateIP checks that a string is a valid IPv4 or IPv6 address.
+func validateIP(ip string) error {
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("%q is not a valid IP address", ip)
+	}
+	return nil
+}
+
+// validateDomain checks that a string looks like a valid FQDN.
+func validateDomain(domain string) error {
+	if !domainRegexp.MatchString(domain) {
+		return fmt.Errorf("%q is not a valid domain name", domain)
+	}
+	return nil
+}
+
+// validateEmail checks that a string looks like a valid email address.
+func validateEmail(email string) error {
+	if !emailRegexp.MatchString(email) {
+		return fmt.Errorf("%q is not a valid email address", email)
 	}
 	return nil
 }

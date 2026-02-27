@@ -26,6 +26,8 @@ type VerifyModel struct {
 	appID string
 	// inst is the instantiated installer.
 	inst installer.Installer
+	// ctx is the cancellable context for the verification check.
+	ctx context.Context
 	// spinner provides visual feedback while verifying.
 	spinner spinner.Model
 	// running is true while verification is in progress.
@@ -40,8 +42,9 @@ type VerifyModel struct {
 }
 
 // NewVerifyModel creates a verification screen for the given app,
-// instantiating the installer from the registry.
-func NewVerifyModel(reg installer.Registry, appID string) VerifyModel {
+// instantiating the installer from the registry. The provided context
+// allows the caller to cancel the verification on navigation or quit.
+func NewVerifyModel(ctx context.Context, reg installer.Registry, appID string) VerifyModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = BannerStyle
@@ -54,6 +57,7 @@ func NewVerifyModel(reg installer.Registry, appID string) VerifyModel {
 	return VerifyModel{
 		appID:   appID,
 		inst:    inst,
+		ctx:     ctx,
 		spinner: s,
 		running: true,
 	}
@@ -73,11 +77,12 @@ func (m VerifyModel) Init() tea.Cmd {
 func (m VerifyModel) runVerify() tea.Cmd {
 	inst := m.inst
 	appID := m.appID
+	ctx := m.ctx
 	return func() tea.Msg {
 		if inst == nil {
 			return VerifyDoneMsg{Err: &verifyError{"no installer for app " + appID}}
 		}
-		err := inst.Verify(context.Background())
+		err := inst.Verify(ctx)
 		return VerifyDoneMsg{Err: err}
 	}
 }

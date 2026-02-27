@@ -532,3 +532,197 @@ func searchSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+// TestValidateForApp verifies per-app config validation catches missing
+// required fields and accepts complete configurations.
+func TestValidateForApp(t *testing.T) {
+	validBase := Config{SonarURL: "https://myisp.sonar.software"}
+
+	tests := []struct {
+		name    string
+		appID   string
+		config  Config
+		wantErr string
+	}{
+		{
+			name:  "portal valid",
+			appID: AppCustomerPortal,
+			config: Config{
+				SonarURL:    "https://myisp.sonar.software",
+				APIUsername: "admin",
+				APIPassword: "secret",
+				Domain:      "portal.example.com",
+				Email:       "admin@example.com",
+			},
+		},
+		{
+			name:    "portal missing domain",
+			appID:   AppCustomerPortal,
+			config:  Config{SonarURL: "https://x.sonar.software", APIUsername: "a", APIPassword: "p", Email: "a@b.com"},
+			wantErr: "domain is required",
+		},
+		{
+			name:    "portal bad domain",
+			appID:   AppCustomerPortal,
+			config:  Config{SonarURL: "https://x.sonar.software", APIUsername: "a", APIPassword: "p", Domain: "not a domain!", Email: "a@b.com"},
+			wantErr: "not a valid domain",
+		},
+		{
+			name:    "portal bad email",
+			appID:   AppCustomerPortal,
+			config:  Config{SonarURL: "https://x.sonar.software", APIUsername: "a", APIPassword: "p", Domain: "portal.example.com", Email: "notanemail"},
+			wantErr: "not a valid email",
+		},
+		{
+			name:  "netflow valid",
+			appID: AppNetflowOnPrem,
+			config: Config{
+				SonarURL: "https://myisp.sonar.software",
+				APIToken: "tok",
+				PublicIP: "203.0.113.1",
+			},
+		},
+		{
+			name:    "netflow missing token",
+			appID:   AppNetflowOnPrem,
+			config:  Config{SonarURL: "https://x.sonar.software", PublicIP: "1.2.3.4"},
+			wantErr: "API token is required",
+		},
+		{
+			name:    "netflow bad IP",
+			appID:   AppNetflowOnPrem,
+			config:  Config{SonarURL: "https://x.sonar.software", APIToken: "tok", PublicIP: "not-an-ip"},
+			wantErr: "not a valid IP",
+		},
+		{
+			name:    "poller missing key",
+			appID:   AppPoller,
+			config:  validBase,
+			wantErr: "poller API key is required",
+		},
+		{
+			name:  "poller valid",
+			appID: AppPoller,
+			config: Config{
+				SonarURL:     "https://x.sonar.software",
+				PollerAPIKey: "key123",
+			},
+		},
+		{
+			name:  "freeradius valid (no extra fields)",
+			appID: AppFreeRADIUS,
+			config: Config{
+				SonarURL: "https://x.sonar.software",
+			},
+		},
+		{
+			name:    "common - bad URL propagates",
+			appID:   AppPoller,
+			config:  Config{SonarURL: "http://bad.url", PollerAPIKey: "key"},
+			wantErr: "must start with https://",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.ValidateForApp(tt.appID)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestValidateURL verifies URL validation accepts valid HTTPS URLs
+// and rejects malformed or non-HTTPS ones.
+func TestValidateURL(t *testing.T) {
+	tests := []struct {
+		url     string
+		wantErr bool
+	}{
+		{"https://example.com", false},
+		{"https://sub.example.com/path", false},
+		{"http://example.com", true},
+		{"not-a-url", true},
+		{"https://", true},
+	}
+	for _, tt := range tests {
+		err := validateURL(tt.url)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("validateURL(%q) error = %v, wantErr = %v", tt.url, err, tt.wantErr)
+		}
+	}
+}
+
+// TestValidateIP verifies IP validation accepts valid IPv4/IPv6 and
+// rejects malformed addresses.
+func TestValidateIP(t *testing.T) {
+	tests := []struct {
+		ip      string
+		wantErr bool
+	}{
+		{"1.2.3.4", false},
+		{"203.0.113.1", false},
+		{"::1", false},
+		{"2001:db8::1", false},
+		{"not-an-ip", true},
+		{"999.999.999.999", true},
+		{"", true},
+	}
+	for _, tt := range tests {
+		err := validateIP(tt.ip)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("validateIP(%q) error = %v, wantErr = %v", tt.ip, err, tt.wantErr)
+		}
+	}
+}
+
+// TestValidateDomain verifies domain validation accepts valid FQDNs
+// and rejects malformed ones.
+func TestValidateDomain(t *testing.T) {
+	tests := []struct {
+		domain  string
+		wantErr bool
+	}{
+		{"example.com", false},
+		{"portal.example.com", false},
+		{"sub.sub.example.co.uk", false},
+		{"not a domain!", true},
+		{"-bad.com", true},
+		{"", true},
+	}
+	for _, tt := range tests {
+		err := validateDomain(tt.domain)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("validateDomain(%q) error = %v, wantErr = %v", tt.domain, err, tt.wantErr)
+		}
+	}
+}
+
+// TestValidateEmail verifies email validation accepts valid addresses
+// and rejects malformed ones.
+func TestValidateEmail(t *testing.T) {
+	tests := []struct {
+		email   string
+		wantErr bool
+	}{
+		{"user@example.com", false},
+		{"admin+tag@sub.example.com", false},
+		{"notanemail", true},
+		{"@missing-local.com", true},
+		{"", true},
+	}
+	for _, tt := range tests {
+		err := validateEmail(tt.email)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("validateEmail(%q) error = %v, wantErr = %v", tt.email, err, tt.wantErr)
+		}
+	}
+}

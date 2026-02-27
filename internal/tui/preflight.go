@@ -48,6 +48,8 @@ type PreflightModel struct {
 	appID string
 	// inst is the instantiated installer.
 	inst installer.Installer
+	// ctx is the cancellable context for the preflight check.
+	ctx context.Context
 	// spinner provides visual feedback while the check is running.
 	spinner spinner.Model
 	// running is true while the preflight check is in progress.
@@ -62,8 +64,9 @@ type PreflightModel struct {
 }
 
 // NewPreflightModel creates a preflight screen for the given app,
-// instantiating the installer from the registry.
-func NewPreflightModel(reg installer.Registry, appID string) PreflightModel {
+// instantiating the installer from the registry. The provided context
+// allows the caller to cancel the preflight check on navigation.
+func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string) PreflightModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = BannerStyle
@@ -76,6 +79,7 @@ func NewPreflightModel(reg installer.Registry, appID string) PreflightModel {
 	return PreflightModel{
 		appID:   appID,
 		inst:    inst,
+		ctx:     ctx,
 		spinner: s,
 		running: true,
 	}
@@ -94,13 +98,14 @@ func (m PreflightModel) Init() tea.Cmd {
 // PreflightCheck and sends a PreflightDoneMsg with the result.
 func (m PreflightModel) runPreflight() tea.Cmd {
 	inst := m.inst
+	ctx := m.ctx
 	return func() tea.Msg {
 		if inst == nil {
 			return PreflightDoneMsg{
 				Err: fmt.Errorf("no installer for app %q", m.appID),
 			}
 		}
-		result, err := inst.PreflightCheck(context.Background())
+		result, err := inst.PreflightCheck(ctx)
 		return PreflightDoneMsg{Result: result, Err: err}
 	}
 }
