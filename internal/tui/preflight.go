@@ -180,6 +180,45 @@ func (m PreflightModel) View() string {
 		b.WriteString(BodyStyle.Render(fmt.Sprintf("OS: %s %s", m.result.OS, m.result.Version)))
 		b.WriteString("\n\n")
 
+		// Hardware checks section — always show detected vs required.
+		if m.result.Hardware != nil && m.result.HardwareReqs != nil {
+			hw := m.result.Hardware
+			reqs := m.result.HardwareReqs
+
+			b.WriteString(BannerStyle.Render("Hardware Checks"))
+			b.WriteString("\n")
+
+			// CPU cores.
+			if hw.CPUCores >= reqs.MinCPUCores {
+				b.WriteString(SuccessStyle.Render(fmt.Sprintf(
+					"  ✓  CPU: %d cores (%d required)", hw.CPUCores, reqs.MinCPUCores)))
+			} else {
+				b.WriteString(WarningStyle.Render(fmt.Sprintf(
+					"  ⚠  CPU: %d cores (%d recommended)", hw.CPUCores, reqs.MinCPUCores)))
+			}
+			b.WriteString("\n")
+
+			// RAM.
+			if hw.RAMMB >= reqs.MinRAMMB {
+				b.WriteString(SuccessStyle.Render(fmt.Sprintf(
+					"  ✓  RAM: %d MB (%d MB required)", hw.RAMMB, reqs.MinRAMMB)))
+			} else {
+				b.WriteString(WarningStyle.Render(fmt.Sprintf(
+					"  ⚠  RAM: %d MB (%d MB recommended)", hw.RAMMB, reqs.MinRAMMB)))
+			}
+			b.WriteString("\n")
+
+			// Disk space.
+			if hw.DiskFreeGB >= reqs.MinDiskGB {
+				b.WriteString(SuccessStyle.Render(fmt.Sprintf(
+					"  ✓  Disk: %d GB free (%d GB required)", hw.DiskFreeGB, reqs.MinDiskGB)))
+			} else {
+				b.WriteString(WarningStyle.Render(fmt.Sprintf(
+					"  ⚠  Disk: %d GB free (%d GB recommended)", hw.DiskFreeGB, reqs.MinDiskGB)))
+			}
+			b.WriteString("\n\n")
+		}
+
 		// Errors (blocking).
 		if len(m.result.Errors) > 0 {
 			b.WriteString(ErrorStyle.Render("Blocking Issues:"))

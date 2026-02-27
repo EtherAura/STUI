@@ -216,6 +216,78 @@ func TestPreflightViewWarnings(t *testing.T) {
 	}
 }
 
+// TestPreflightViewHardwareChecksPass verifies that hardware check
+// lines appear with success indicators when specs meet requirements.
+func TestPreflightViewHardwareChecksPass(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:  true,
+		OS:      "ubuntu",
+		Version: "24.04",
+		Hardware: &installer.HardwareInfo{
+			CPUCores:   4,
+			RAMMB:      8192,
+			DiskFreeGB: 100,
+		},
+		HardwareReqs: &installer.HardwareReqs{
+			MinCPUCores: 2,
+			MinRAMMB:    2048,
+			MinDiskGB:   10,
+		},
+	}})
+	view := m.View()
+
+	if !strings.Contains(view, "Hardware Checks") {
+		t.Error("view should contain Hardware Checks heading")
+	}
+	if !strings.Contains(view, "CPU") {
+		t.Error("view should show CPU check")
+	}
+	if !strings.Contains(view, "RAM") {
+		t.Error("view should show RAM check")
+	}
+	if !strings.Contains(view, "Disk") {
+		t.Error("view should show Disk check")
+	}
+}
+
+// TestPreflightViewHardwareChecksFail verifies that hardware check
+// lines appear with warning indicators when specs are below requirements.
+func TestPreflightViewHardwareChecksFail(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(reg, installer.AppCustomerPortal)
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:  true,
+		OS:      "ubuntu",
+		Version: "24.04",
+		Hardware: &installer.HardwareInfo{
+			CPUCores:   1,
+			RAMMB:      512,
+			DiskFreeGB: 5,
+		},
+		HardwareReqs: &installer.HardwareReqs{
+			MinCPUCores: 2,
+			MinRAMMB:    2048,
+			MinDiskGB:   10,
+		},
+		Warnings: []string{
+			"CPU: 1 cores detected, 2 recommended",
+			"RAM: 512 MB detected, 2048 MB recommended",
+			"Disk: 5 GB free, 10 GB recommended",
+		},
+	}})
+	view := m.View()
+
+	if !strings.Contains(view, "Hardware Checks") {
+		t.Error("view should contain Hardware Checks heading")
+	}
+	// All three should show warning indicators.
+	if !strings.Contains(view, "⚠") {
+		t.Error("view should show warning indicators for below-spec hardware")
+	}
+}
+
 // TestPreflightViewError verifies the error view when the check fails to run.
 func TestPreflightViewError(t *testing.T) {
 	reg := installer.NewRegistry()

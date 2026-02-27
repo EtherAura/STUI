@@ -73,13 +73,16 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 	}
 
 	// Check hardware against Sonar recommendations.
+	reqs := &HardwareReqs{
+		MinCPUCores: 1,
+		MinRAMMB:    1024,
+		MinDiskGB:   10,
+	}
 	hw, hwErr := DetectHardware()
 	if hwErr == nil {
-		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
-			MinCPUCores: 1,
-			MinRAMMB:    1024,
-			MinDiskGB:   10,
-		})...)
+		result.Hardware = hw
+		result.HardwareReqs = reqs
+		result.Warnings = append(result.Warnings, CheckHardware(hw, reqs)...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.

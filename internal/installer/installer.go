@@ -85,6 +85,12 @@ type PreflightResult struct {
 	// Escalation is the detected privilege escalation method (sudo/doas),
 	// or nil if none is available. Only set when NeedsRoot is true.
 	Escalation *EscalationMethod
+	// Hardware holds the detected system hardware specs, or nil if
+	// detection failed.
+	Hardware *HardwareInfo
+	// HardwareReqs holds the recommended hardware for this installer,
+	// used by the view to render per-metric pass/fail lines.
+	HardwareReqs *HardwareReqs
 }
 
 // Installer is the interface that all Sonar application installers implement.

@@ -73,13 +73,16 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 	}
 
 	// Check hardware against Sonar recommendations.
+	reqs := &HardwareReqs{
+		MinCPUCores: 2,
+		MinRAMMB:    4096,
+		MinDiskGB:   50,
+	}
 	hw, hwErr := DetectHardware()
 	if hwErr == nil {
-		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
-			MinCPUCores: 2,
-			MinRAMMB:    4096,
-			MinDiskGB:   50,
-		})...)
+		result.Hardware = hw
+		result.HardwareReqs = reqs
+		result.Warnings = append(result.Warnings, CheckHardware(hw, reqs)...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.

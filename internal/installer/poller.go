@@ -64,13 +64,16 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	}
 
 	// Check hardware against Sonar recommendations.
+	reqs := &HardwareReqs{
+		MinCPUCores: 2,
+		MinRAMMB:    2048,
+		MinDiskGB:   20,
+	}
 	hw, hwErr := DetectHardware()
 	if hwErr == nil {
-		result.Warnings = append(result.Warnings, CheckHardware(hw, &HardwareReqs{
-			MinCPUCores: 2,
-			MinRAMMB:    2048,
-			MinDiskGB:   20,
-		})...)
+		result.Hardware = hw
+		result.HardwareReqs = reqs
+		result.Warnings = append(result.Warnings, CheckHardware(hw, reqs)...)
 	}
 
 	// Check root — flag for sudo/doas relaunch option.
