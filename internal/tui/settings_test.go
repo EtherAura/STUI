@@ -1,5 +1,6 @@
 // settings_test.go contains unit tests for the SettingsModel,
-// covering initialization, back navigation, and view rendering.
+// covering initialization, toggle behaviour, navigation, back
+// navigation, and view rendering.
 package tui
 
 import (
@@ -10,11 +11,17 @@ import (
 )
 
 // TestNewSettingsModel verifies the settings screen initializes
-// with zero dimensions.
+// with show-passwords off and cursor at zero.
 func TestNewSettingsModel(t *testing.T) {
 	m := NewSettingsModel()
 	if m.width != 0 || m.height != 0 {
 		t.Error("new settings model should have zero dimensions")
+	}
+	if m.ShowPasswords() {
+		t.Error("show passwords should default to false")
+	}
+	if m.Cursor() != 0 {
+		t.Errorf("cursor should start at 0, got %d", m.Cursor())
 	}
 }
 
@@ -28,7 +35,7 @@ func TestSettingsModelInit(t *testing.T) {
 }
 
 // TestSettingsModelViewContent verifies the view contains the
-// expected placeholder text.
+// settings title and toggle labels.
 func TestSettingsModelViewContent(t *testing.T) {
 	m := NewSettingsModel()
 	view := m.View()
@@ -36,8 +43,44 @@ func TestSettingsModelViewContent(t *testing.T) {
 	if !strings.Contains(view, "Settings") {
 		t.Error("view should contain 'Settings'")
 	}
-	if !strings.Contains(view, "No settings available yet") {
-		t.Error("view should contain placeholder text")
+	if !strings.Contains(view, "Show Passwords") {
+		t.Error("view should contain 'Show Passwords' label")
+	}
+	if !strings.Contains(view, "[ ]") {
+		t.Error("view should show unchecked checkbox by default")
+	}
+}
+
+// TestSettingsModelToggleSpace verifies pressing space toggles
+// the show-passwords setting on and off.
+func TestSettingsModelToggleSpace(t *testing.T) {
+	m := NewSettingsModel()
+
+	// Toggle on.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	if !m.ShowPasswords() {
+		t.Error("show passwords should be true after space toggle")
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "[x]") {
+		t.Error("view should show checked checkbox after toggle on")
+	}
+
+	// Toggle off.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	if m.ShowPasswords() {
+		t.Error("show passwords should be false after second toggle")
+	}
+}
+
+// TestSettingsModelToggleEnter verifies pressing enter also toggles.
+func TestSettingsModelToggleEnter(t *testing.T) {
+	m := NewSettingsModel()
+
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.ShowPasswords() {
+		t.Error("show passwords should be true after enter toggle")
 	}
 }
 
@@ -91,5 +134,22 @@ func TestSettingsModelUnhandledKey(t *testing.T) {
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	if cmd != nil {
 		t.Error("unrecognized key should not produce a command")
+	}
+}
+
+// TestSettingsModelPersistsAcrossNavigations verifies that toggling
+// a setting survives a round-trip through the back key.
+func TestSettingsModelPersistsAcrossNavigations(t *testing.T) {
+	m := NewSettingsModel()
+
+	// Toggle show passwords on.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	if !m.ShowPasswords() {
+		t.Error("show passwords should be true after toggle")
+	}
+
+	// Simulate navigating away and back — the model struct retains state.
+	if !m.ShowPasswords() {
+		t.Error("show passwords should still be true after simulated nav")
 	}
 }

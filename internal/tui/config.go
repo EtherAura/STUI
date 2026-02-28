@@ -73,6 +73,9 @@ type ConfigModel struct {
 	inputs []textinput.Model
 	// focusIndex tracks which input is currently focused.
 	focusIndex int
+	// showPasswords mirrors the settings toggle; when true, secret
+	// fields display their values in plaintext instead of masked.
+	showPasswords bool
 	// err holds any validation error to display.
 	err string
 	// width and height track the terminal dimensions.
@@ -81,7 +84,9 @@ type ConfigModel struct {
 }
 
 // NewConfigModel creates a config wizard for the given app ID.
-func NewConfigModel(appID string) ConfigModel {
+// showPasswords controls whether secret fields display plaintext
+// (true) or use masked/password echo mode (false).
+func NewConfigModel(appID string, showPasswords bool) ConfigModel {
 	fields, ok := appConfigFields[appID]
 	if !ok {
 		fields = []configField{
@@ -95,7 +100,7 @@ func NewConfigModel(appID string) ConfigModel {
 		ti.Placeholder = f.placeholder
 		ti.CharLimit = 256
 		ti.Width = 40
-		if f.secret {
+		if f.secret && !showPasswords {
 			ti.EchoMode = textinput.EchoPassword
 			ti.EchoCharacter = '•'
 		}
@@ -106,9 +111,10 @@ func NewConfigModel(appID string) ConfigModel {
 	}
 
 	return ConfigModel{
-		appID:  appID,
-		fields: fields,
-		inputs: inputs,
+		appID:         appID,
+		fields:        fields,
+		inputs:        inputs,
+		showPasswords: showPasswords,
 	}
 }
 

@@ -85,6 +85,7 @@ func NewAppModel() AppModel {
 		registry: reg,
 		screen:   ScreenMenu,
 		menu:     NewMenuModel(),
+		settings: NewSettingsModel(),
 	}
 }
 
@@ -136,7 +137,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = ScreenInstallers
 			return m, nil
 		case CategorySettings:
-			m.settings = NewSettingsModel()
 			m.screen = ScreenSettings
 			return m, nil
 		case CategoryHelp:
@@ -171,7 +171,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case StartConfigMsg:
 		// Cancel the preflight context (check is done).
 		m.cancelRunning()
-		m.config = NewConfigModel(msg.AppID)
+		m.config = NewConfigModel(msg.AppID, m.settings.ShowPasswords())
 		m.screen = ScreenConfig
 		return m, m.config.Init()
 	case ConfigDoneMsg:

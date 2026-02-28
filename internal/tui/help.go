@@ -65,7 +65,7 @@ func (m HelpModel) View() string {
 	b.WriteString("\n")
 	b.WriteString(BodyStyle.Render("  STUI is a community-built terminal interface for"))
 	b.WriteString("\n")
-	b.WriteString(BodyStyle.Render("  installing and managing Sonar applications."))
+	b.WriteString(BodyStyle.Render("  installing and managing Sonar Software applications."))
 	b.WriteString("\n\n")
 	b.WriteString(DimStyle.Render("  https://github.com/EtherAura/stui"))
 	b.WriteString("\n\n")
