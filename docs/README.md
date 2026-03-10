@@ -4,6 +4,8 @@ STUI is a **community-built** tool that simplifies the installation of applicati
 
 For bugs, feature requests, or questions about **STUI itself**, please [open an issue](https://github.com/EtherAura/stui/issues) on this repository.
 
+Application installation workflows are currently untested and unfinished.
+
 ## Contents
 
 - [Usage](usage.md) — Installing, running, and navigating STUI
