@@ -50,9 +50,12 @@ func (p *PortalInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets Customer Portal requirements:
 // Ubuntu OS, git and curl available, and root access.
-func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
+func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
-	system := NewLocalSystem()
+	system, err := SystemForTarget(target)
+	if err != nil {
+		return nil, fmt.Errorf("resolving target system: %w", err)
+	}
 
 	osInfo, err := DetectOSOn(system)
 	if err != nil {

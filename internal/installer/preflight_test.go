@@ -67,7 +67,7 @@ func TestPortalPreflightCheckStructure(t *testing.T) {
 	p := NewPortalInstaller()
 	ctx := context.Background()
 
-	result, err := p.PreflightCheck(ctx)
+	result, err := p.PreflightCheck(ctx, Target{})
 	if err != nil {
 		t.Fatalf("PreflightCheck returned error: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestNetflowPreflightCheckStructure(t *testing.T) {
 	n := NewNetflowInstaller()
 	ctx := context.Background()
 
-	result, err := n.PreflightCheck(ctx)
+	result, err := n.PreflightCheck(ctx, Target{})
 	if err != nil {
 		t.Fatalf("PreflightCheck returned error: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestFreeRADIUSPreflightCheckStructure(t *testing.T) {
 	f := NewFreeRADIUSInstaller()
 	ctx := context.Background()
 
-	result, err := f.PreflightCheck(ctx)
+	result, err := f.PreflightCheck(ctx, Target{})
 	if err != nil {
 		t.Fatalf("PreflightCheck returned error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestPollerPreflightCheckStructure(t *testing.T) {
 	p := NewPollerInstaller()
 	ctx := context.Background()
 
-	result, err := p.PreflightCheck(ctx)
+	result, err := p.PreflightCheck(ctx, Target{})
 	if err != nil {
 		t.Fatalf("PreflightCheck returned error: %v", err)
 	}
@@ -303,7 +303,7 @@ func TestPreflightNeedsRootSet(t *testing.T) {
 
 	for _, inst := range installers {
 		t.Run(inst.Name(), func(t *testing.T) {
-			result, err := inst.PreflightCheck(ctx)
+			result, err := inst.PreflightCheck(ctx, Target{})
 			if err != nil {
 				t.Fatalf("PreflightCheck returned error: %v", err)
 			}
@@ -324,7 +324,7 @@ func TestPreflightOSWarningNotBlocking(t *testing.T) {
 	p := NewPortalInstaller()
 	ctx := context.Background()
 
-	result, err := p.PreflightCheck(ctx)
+	result, err := p.PreflightCheck(ctx, Target{})
 	if err != nil {
 		t.Fatalf("PreflightCheck returned error: %v", err)
 	}

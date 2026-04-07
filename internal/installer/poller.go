@@ -47,9 +47,12 @@ func (p *PollerInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets Poller requirements:
 // Ubuntu OS and root access.
-func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
+func (p *PollerInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
-	system := NewLocalSystem()
+	system, err := SystemForTarget(target)
+	if err != nil {
+		return nil, fmt.Errorf("resolving target system: %w", err)
+	}
 
 	osInfo, err := DetectOSOn(system)
 	if err != nil {

@@ -50,9 +50,12 @@ func (f *FreeRADIUSInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets FreeRADIUS requirements:
 // Ubuntu OS, git available, and root access.
-func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
+func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
-	system := NewLocalSystem()
+	system, err := SystemForTarget(target)
+	if err != nil {
+		return nil, fmt.Errorf("resolving target system: %w", err)
+	}
 
 	osInfo, err := DetectOSOn(system)
 	if err != nil {

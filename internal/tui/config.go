@@ -67,6 +67,8 @@ var appConfigFields = map[string][]configField{
 type ConfigModel struct {
 	// appID is the registry key of the selected application.
 	appID string
+	// target is the selected install target.
+	target installer.Target
 	// fields defines what config values to collect.
 	fields []configField
 	// inputs holds the text input models for each field.
@@ -87,6 +89,12 @@ type ConfigModel struct {
 // showPasswords controls whether secret fields display plaintext
 // (true) or use masked/password echo mode (false).
 func NewConfigModel(appID string, showPasswords bool) ConfigModel {
+	return NewConfigModelWithTarget(appID, installer.Target{}, showPasswords)
+}
+
+// NewConfigModelWithTarget creates a config wizard for the given app ID
+// and selected install target.
+func NewConfigModelWithTarget(appID string, target installer.Target, showPasswords bool) ConfigModel {
 	fields, ok := appConfigFields[appID]
 	if !ok {
 		fields = []configField{
@@ -112,6 +120,7 @@ func NewConfigModel(appID string, showPasswords bool) ConfigModel {
 
 	return ConfigModel{
 		appID:         appID,
+		target:        target,
 		fields:        fields,
 		inputs:        inputs,
 		showPasswords: showPasswords,
@@ -200,7 +209,7 @@ func (m ConfigModel) submit() (ConfigModel, tea.Cmd) {
 
 // buildConfig constructs an installer.Config from the input values.
 func (m ConfigModel) buildConfig() *installer.Config {
-	cfg := &installer.Config{}
+	cfg := &installer.Config{Target: m.target}
 	for i, f := range m.fields {
 		val := strings.TrimSpace(m.inputs[i].Value())
 		switch f.key {
@@ -234,6 +243,8 @@ func (m ConfigModel) View() string {
 	var b strings.Builder
 
 	b.WriteString(TitleStyle.Render("Configuration"))
+	b.WriteString("\n")
+	b.WriteString(DimStyle.Render("Target: " + m.target.Display()))
 	b.WriteString("\n")
 	b.WriteString(DimStyle.Render("Fill in the values below. Tab/Shift+Tab to navigate."))
 	b.WriteString("\n\n")

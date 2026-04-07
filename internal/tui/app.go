@@ -20,6 +20,8 @@ const (
 	ScreenInstallers
 	// ScreenDetail shows app details and a confirm/back prompt.
 	ScreenDetail
+	// ScreenTarget collects the install target before preflight.
+	ScreenTarget
 	// ScreenPreflight runs and displays preflight checks.
 	ScreenPreflight
 	// ScreenConfig is the interactive configuration wizard.
@@ -48,6 +50,8 @@ type AppModel struct {
 	installerList InstallerListModel
 	// detail is the app detail/confirm screen model.
 	detail DetailModel
+	// target is the install target selection screen model.
+	target TargetModel
 	// preflight is the preflight check screen model.
 	preflight PreflightModel
 	// config is the configuration wizard screen model.
@@ -100,7 +104,7 @@ func NewAppModelWithResume(appID string) AppModel {
 		registry:    reg,
 		screen:      ScreenPreflight,
 		menu:        NewMenuModel(),
-		preflight:   NewPreflightModel(ctx, reg, appID),
+		preflight:   NewPreflightModel(ctx, reg, appID, installer.Target{}),
 		cancel:      cancel,
 		resumeAppID: appID,
 	}
@@ -156,22 +160,29 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.screen {
 		case ScreenDetail:
 			m.screen = ScreenInstallers
+		case ScreenTarget:
+			m.screen = ScreenDetail
 		default:
 			m.screen = ScreenMenu
 		}
 		return m, nil
+	case StartTargetMsg:
+		m.cancelRunning()
+		m.target = NewTargetModel(msg.AppID)
+		m.screen = ScreenTarget
+		return m, m.target.Init()
 	case StartPreflightMsg:
 		// Cancel any prior operation and create a new context.
 		m.cancelRunning()
 		ctx, cancel := context.WithCancel(context.Background())
 		m.cancel = cancel
-		m.preflight = NewPreflightModel(ctx, m.registry, msg.AppID)
+		m.preflight = NewPreflightModel(ctx, m.registry, msg.AppID, msg.Target)
 		m.screen = ScreenPreflight
 		return m, m.preflight.Init()
 	case StartConfigMsg:
 		// Cancel the preflight context (check is done).
 		m.cancelRunning()
-		m.config = NewConfigModel(msg.AppID, m.settings.ShowPasswords())
+		m.config = NewConfigModelWithTarget(msg.AppID, msg.Target, m.settings.ShowPasswords())
 		m.screen = ScreenConfig
 		return m, m.config.Init()
 	case ConfigDoneMsg:
@@ -208,6 +219,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.installerList, cmd = m.installerList.Update(msg)
 	case ScreenDetail:
 		m.detail, cmd = m.detail.Update(msg)
+	case ScreenTarget:
+		m.target, cmd = m.target.Update(msg)
 	case ScreenPreflight:
 		m.preflight, cmd = m.preflight.Update(msg)
 	case ScreenConfig:
@@ -238,6 +251,8 @@ func (m AppModel) View() string {
 		return m.installerList.View()
 	case ScreenDetail:
 		return m.detail.View()
+	case ScreenTarget:
+		return m.target.View()
 	case ScreenPreflight:
 		return m.preflight.View()
 	case ScreenConfig:

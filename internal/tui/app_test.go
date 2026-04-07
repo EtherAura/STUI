@@ -184,7 +184,7 @@ func TestAppModelCategorySelected(t *testing.T) {
 // and start from zero.
 func TestScreenConstants(t *testing.T) {
 	screens := []Screen{
-		ScreenMenu, ScreenInstallers, ScreenDetail, ScreenPreflight,
+		ScreenMenu, ScreenInstallers, ScreenDetail, ScreenTarget, ScreenPreflight,
 		ScreenConfig, ScreenInstall, ScreenVerify,
 		ScreenSettings, ScreenHelp,
 	}

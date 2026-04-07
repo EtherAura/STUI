@@ -13,9 +13,9 @@ import (
 	"github.com/EtherAura/stui/internal/installer"
 )
 
-// StartPreflightMsg signals the app to transition from the detail
-// screen to the preflight check screen.
-type StartPreflightMsg struct {
+// StartTargetMsg signals the app to transition from the detail
+// screen to the target selection screen.
+type StartTargetMsg struct {
 	// AppID is the registry key of the selected application.
 	AppID string
 }
@@ -61,7 +61,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		switch msg.String() {
 		case "enter":
 			return m, func() tea.Msg {
-				return StartPreflightMsg{AppID: m.appID}
+				return StartTargetMsg{AppID: m.appID}
 			}
 		case "esc", "backspace":
 			return m, func() tea.Msg {

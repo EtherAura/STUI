@@ -29,6 +29,8 @@ type PreflightDoneMsg struct {
 type StartConfigMsg struct {
 	// AppID is the registry key of the selected application.
 	AppID string
+	// Target is the chosen install target.
+	Target installer.Target
 }
 
 // ElevateMsg signals that the application should quit and
@@ -50,6 +52,8 @@ type PreflightModel struct {
 	inst installer.Installer
 	// ctx is the cancellable context for the preflight check.
 	ctx context.Context
+	// target is the selected install target.
+	target installer.Target
 	// spinner provides visual feedback while the check is running.
 	spinner spinner.Model
 	// running is true while the preflight check is in progress.
@@ -66,7 +70,7 @@ type PreflightModel struct {
 // NewPreflightModel creates a preflight screen for the given app,
 // instantiating the installer from the registry. The provided context
 // allows the caller to cancel the preflight check on navigation.
-func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string) PreflightModel {
+func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string, target installer.Target) PreflightModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = BannerStyle
@@ -80,6 +84,7 @@ func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string
 		appID:   appID,
 		inst:    inst,
 		ctx:     ctx,
+		target:  target,
 		spinner: s,
 		running: true,
 	}
@@ -99,13 +104,14 @@ func (m PreflightModel) Init() tea.Cmd {
 func (m PreflightModel) runPreflight() tea.Cmd {
 	inst := m.inst
 	ctx := m.ctx
+	target := m.target
 	return func() tea.Msg {
 		if inst == nil {
 			return PreflightDoneMsg{
 				Err: fmt.Errorf("no installer for app %q", m.appID),
 			}
 		}
-		result, err := inst.PreflightCheck(ctx)
+		result, err := inst.PreflightCheck(ctx, target)
 		return PreflightDoneMsg{Result: result, Err: err}
 	}
 }
@@ -126,7 +132,7 @@ func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 				// Only proceed if checks passed.
 				if m.result != nil && m.result.Passed {
 					return m, func() tea.Msg {
-						return StartConfigMsg{AppID: m.appID}
+						return StartConfigMsg{AppID: m.appID, Target: m.target}
 					}
 				}
 			case "s":
@@ -167,7 +173,7 @@ func (m PreflightModel) View() string {
 
 	if m.running {
 		b.WriteString(m.spinner.View())
-		b.WriteString(" Running preflight checks...")
+		b.WriteString(" Running preflight checks on " + m.target.Display() + "...")
 		return AppStyle.Render(b.String())
 	}
 
@@ -181,6 +187,9 @@ func (m PreflightModel) View() string {
 
 	// Display results.
 	if m.result != nil {
+		b.WriteString(BodyStyle.Render("Target: " + m.target.Display()))
+		b.WriteString("\n\n")
+
 		// OS info.
 		b.WriteString(BodyStyle.Render(fmt.Sprintf("OS: %s %s", m.result.OS, m.result.Version)))
 		b.WriteString("\n\n")

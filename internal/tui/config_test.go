@@ -230,7 +230,7 @@ func TestConfigModelAllApps(t *testing.T) {
 func TestAppModelTransitionToConfig(t *testing.T) {
 	m := NewAppModel()
 
-	updated, _ := m.Update(StartConfigMsg{AppID: installer.AppCustomerPortal})
+	updated, _ := m.Update(StartConfigMsg{AppID: installer.AppCustomerPortal, Target: installer.Target{}})
 	model := updated.(AppModel)
 
 	if model.Screen() != ScreenConfig {

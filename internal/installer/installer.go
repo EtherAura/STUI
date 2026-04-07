@@ -36,6 +36,15 @@ type Target struct {
 	Port int
 }
 
+// Display returns a human-readable summary of the target.
+func (t Target) Display() string {
+	t.Normalize()
+	if t.Mode == TargetModeSSH {
+		return fmt.Sprintf("%s@%s:%d", t.User, t.Host, t.Port)
+	}
+	return "local host"
+}
+
 // Normalize applies defaults so a zero-value Target behaves like localhost.
 func (t *Target) Normalize() {
 	if t.Mode == "" {
@@ -273,7 +282,7 @@ type Installer interface {
 	HardwareRequirements() HardwareReqs
 
 	// PreflightCheck verifies the system meets requirements.
-	PreflightCheck(ctx context.Context) (*PreflightResult, error)
+	PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error)
 
 	// Steps returns the ordered installation steps.
 	Steps() []Step

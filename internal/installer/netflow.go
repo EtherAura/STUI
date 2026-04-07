@@ -48,9 +48,12 @@ func (n *NetflowInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets Netflow requirements:
 // Ubuntu or Debian OS, git/make/unzip available, and root access.
-func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
+func (n *NetflowInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
-	system := NewLocalSystem()
+	system, err := SystemForTarget(target)
+	if err != nil {
+		return nil, fmt.Errorf("resolving target system: %w", err)
+	}
 
 	osInfo, err := DetectOSOn(system)
 	if err != nil {

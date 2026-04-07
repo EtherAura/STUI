@@ -91,7 +91,7 @@ func TestDetailModelViewUnknown(t *testing.T) {
 	}
 }
 
-// TestDetailModelEnterKey verifies pressing enter produces a StartPreflightMsg.
+// TestDetailModelEnterKey verifies pressing enter produces a StartTargetMsg.
 func TestDetailModelEnterKey(t *testing.T) {
 	reg := installer.NewRegistry()
 	m := NewDetailModel(reg, installer.AppPoller)
@@ -102,12 +102,12 @@ func TestDetailModelEnterKey(t *testing.T) {
 	}
 
 	msg := cmd()
-	preflight, ok := msg.(StartPreflightMsg)
+	preflight, ok := msg.(StartTargetMsg)
 	if !ok {
-		t.Fatalf("command should produce StartPreflightMsg, got %T", msg)
+		t.Fatalf("command should produce StartTargetMsg, got %T", msg)
 	}
 	if preflight.AppID != installer.AppPoller {
-		t.Errorf("StartPreflightMsg.AppID = %q, want %q", preflight.AppID, installer.AppPoller)
+		t.Errorf("StartTargetMsg.AppID = %q, want %q", preflight.AppID, installer.AppPoller)
 	}
 }
 
