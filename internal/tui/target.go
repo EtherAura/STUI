@@ -72,10 +72,11 @@ func NewTargetModel(appID string) TargetModel {
 	}
 
 	return TargetModel{
-		appID:  appID,
-		mode:   installer.TargetModeLocal,
-		fields: targetFields,
-		inputs: inputs,
+		appID:      appID,
+		mode:       installer.TargetModeLocal,
+		fields:     targetFields,
+		inputs:     inputs,
+		focusIndex: 1,
 	}
 }
 

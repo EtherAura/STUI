@@ -14,8 +14,8 @@ func TestNewTargetModel(t *testing.T) {
 	if m.AppID() != installer.AppCustomerPortal {
 		t.Fatalf("AppID() = %q, want %q", m.AppID(), installer.AppCustomerPortal)
 	}
-	if m.FocusIndex() != 0 {
-		t.Fatalf("FocusIndex() = %d, want 0", m.FocusIndex())
+	if m.FocusIndex() != 1 {
+		t.Fatalf("FocusIndex() = %d, want 1", m.FocusIndex())
 	}
 	if m.mode != installer.TargetModeLocal {
 		t.Fatalf("default mode = %q, want %q", m.mode, installer.TargetModeLocal)
@@ -24,7 +24,6 @@ func TestNewTargetModel(t *testing.T) {
 
 func TestTargetModelSubmitLocal(t *testing.T) {
 	m := NewTargetModel(installer.AppPoller)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 
@@ -46,7 +45,6 @@ func TestTargetModelSubmitLocal(t *testing.T) {
 func TestTargetModelToggleMode(t *testing.T) {
 	m := NewTargetModel(installer.AppPoller)
 
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
 	if m.mode != installer.TargetModeLocal {
 		t.Fatalf("mode should stay local when selecting Local, got %q", m.mode)
@@ -82,7 +80,7 @@ func TestTargetModelProceedRowForSSH(t *testing.T) {
 	m := NewTargetModel(installer.AppPoller)
 	m.mode = installer.TargetModeSSH
 
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 7; i++ {
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
 
