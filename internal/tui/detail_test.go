@@ -63,8 +63,8 @@ func TestDetailModelViewContent(t *testing.T) {
 	if !strings.Contains(view, "Requirements") {
 		t.Error("view should contain Requirements heading")
 	}
-	if !strings.Contains(view, "docker") {
-		t.Error("view should list docker as requirement for portal")
+	if !strings.Contains(view, "unzip") {
+		t.Error("view should list unzip as requirement for portal")
 	}
 	if !strings.Contains(view, "Install prerequisites") {
 		t.Error("view should contain first step name")

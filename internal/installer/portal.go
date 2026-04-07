@@ -30,7 +30,7 @@ func (p *PortalInstaller) Description() string {
 func (p *PortalInstaller) Requirements() []string {
 	return []string{
 		"OS: Ubuntu (recommended)",
-		"Commands: git, curl, docker",
+		"Commands: git, unzip (Docker installed by install.sh)",
 		"Privileges: root / sudo",
 		"CPU: 2+ cores",
 		"RAM: 2 GB+",
@@ -70,12 +70,18 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*P
 			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
 	}
 
-	// Check required commands.
-	for _, cmd := range []string{"git", "curl", "docker"} {
+	// Check commands needed before the installer can bootstrap the host.
+	for _, cmd := range []string{"git", "unzip"} {
 		if !CommandExistsOn(system, cmd) {
 			result.Passed = false
 			result.Errors = append(result.Errors, fmt.Sprintf("required command not found: %s", cmd))
 		}
+	}
+
+	// Docker is installed by the upstream install.sh, so missing it should not
+	// block preflight. Surface it as an informational warning instead.
+	if !CommandExistsOn(system, "docker") {
+		result.Warnings = append(result.Warnings, "docker not found; upstream install.sh is expected to install Docker")
 	}
 
 	// Check hardware against Sonar recommendations.

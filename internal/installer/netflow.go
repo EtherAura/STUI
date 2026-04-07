@@ -28,7 +28,7 @@ func (n *NetflowInstaller) Description() string { return "Netflow on-premise pro
 func (n *NetflowInstaller) Requirements() []string {
 	return []string{
 		"OS: Ubuntu or Debian (recommended)",
-		"Commands: git, make, unzip, docker",
+		"Commands: git, make, unzip (Docker installed by install.sh)",
 		"Privileges: root / sudo",
 		"CPU: 2+ cores",
 		"RAM: 4 GB+",
@@ -68,12 +68,18 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context, target Target) (*
 			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu or Debian)", osInfo.ID))
 	}
 
-	// Check required commands.
-	for _, cmd := range []string{"git", "make", "unzip", "docker"} {
+	// Check commands needed before the installer can bootstrap the host.
+	for _, cmd := range []string{"git", "make", "unzip"} {
 		if !CommandExistsOn(system, cmd) {
 			result.Passed = false
 			result.Errors = append(result.Errors, fmt.Sprintf("required command not found: %s", cmd))
 		}
+	}
+
+	// Docker is installed by the upstream install.sh, so missing it should not
+	// block preflight. Surface it as an informational warning instead.
+	if !CommandExistsOn(system, "docker") {
+		result.Warnings = append(result.Warnings, "docker not found; upstream install.sh is expected to install Docker")
 	}
 
 	// Check hardware against Sonar recommendations.
