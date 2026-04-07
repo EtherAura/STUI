@@ -50,8 +50,9 @@ func (n *NetflowInstaller) HardwareRequirements() HardwareReqs {
 // Ubuntu or Debian OS, git/make/unzip available, and root access.
 func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
+	system := NewLocalSystem()
 
-	osInfo, err := DetectOS()
+	osInfo, err := DetectOSOn(system)
 	if err != nil {
 		return nil, fmt.Errorf("detecting OS: %w", err)
 	}
@@ -66,7 +67,7 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 
 	// Check required commands.
 	for _, cmd := range []string{"git", "make", "unzip", "docker"} {
-		if !CommandExists(cmd) {
+		if !CommandExistsOn(system, cmd) {
 			result.Passed = false
 			result.Errors = append(result.Errors, fmt.Sprintf("required command not found: %s", cmd))
 		}
@@ -78,7 +79,7 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 		MinRAMMB:    4096,
 		MinDiskGB:   50,
 	}
-	hw, hwErr := DetectHardware()
+	hw, hwErr := DetectHardwareOn(system)
 	if hwErr == nil {
 		result.Hardware = hw
 		result.HardwareReqs = reqs
@@ -86,9 +87,9 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context) (*PreflightResult
 	}
 
 	// Check root — flag for sudo/doas relaunch option.
-	if !IsRoot() {
+	if !system.IsRoot() {
 		result.NeedsRoot = true
-		result.Escalation = DetectEscalation()
+		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 

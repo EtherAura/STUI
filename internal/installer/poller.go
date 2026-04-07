@@ -49,8 +49,9 @@ func (p *PollerInstaller) HardwareRequirements() HardwareReqs {
 // Ubuntu OS and root access.
 func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
+	system := NewLocalSystem()
 
-	osInfo, err := DetectOS()
+	osInfo, err := DetectOSOn(system)
 	if err != nil {
 		return nil, fmt.Errorf("detecting OS: %w", err)
 	}
@@ -69,7 +70,7 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 		MinRAMMB:    2048,
 		MinDiskGB:   20,
 	}
-	hw, hwErr := DetectHardware()
+	hw, hwErr := DetectHardwareOn(system)
 	if hwErr == nil {
 		result.Hardware = hw
 		result.HardwareReqs = reqs
@@ -77,9 +78,9 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	}
 
 	// Check root — flag for sudo/doas relaunch option.
-	if !IsRoot() {
+	if !system.IsRoot() {
 		result.NeedsRoot = true
-		result.Escalation = DetectEscalation()
+		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 

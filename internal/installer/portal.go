@@ -52,8 +52,9 @@ func (p *PortalInstaller) HardwareRequirements() HardwareReqs {
 // Ubuntu OS, git and curl available, and root access.
 func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
+	system := NewLocalSystem()
 
-	osInfo, err := DetectOS()
+	osInfo, err := DetectOSOn(system)
 	if err != nil {
 		return nil, fmt.Errorf("detecting OS: %w", err)
 	}
@@ -68,7 +69,7 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 
 	// Check required commands.
 	for _, cmd := range []string{"git", "curl", "docker"} {
-		if !CommandExists(cmd) {
+		if !CommandExistsOn(system, cmd) {
 			result.Passed = false
 			result.Errors = append(result.Errors, fmt.Sprintf("required command not found: %s", cmd))
 		}
@@ -80,7 +81,7 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 		MinRAMMB:    2048,
 		MinDiskGB:   10,
 	}
-	hw, hwErr := DetectHardware()
+	hw, hwErr := DetectHardwareOn(system)
 	if hwErr == nil {
 		result.Hardware = hw
 		result.HardwareReqs = reqs
@@ -88,9 +89,9 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context) (*PreflightResult,
 	}
 
 	// Check root — flag for sudo/doas relaunch option.
-	if !IsRoot() {
+	if !system.IsRoot() {
 		result.NeedsRoot = true
-		result.Escalation = DetectEscalation()
+		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 

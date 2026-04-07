@@ -52,8 +52,9 @@ func (f *FreeRADIUSInstaller) HardwareRequirements() HardwareReqs {
 // Ubuntu OS, git available, and root access.
 func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightResult, error) {
 	result := &PreflightResult{Passed: true}
+	system := NewLocalSystem()
 
-	osInfo, err := DetectOS()
+	osInfo, err := DetectOSOn(system)
 	if err != nil {
 		return nil, fmt.Errorf("detecting OS: %w", err)
 	}
@@ -67,7 +68,7 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 	}
 
 	// Check required commands.
-	if !CommandExists("git") {
+	if !CommandExistsOn(system, "git") {
 		result.Passed = false
 		result.Errors = append(result.Errors, "required command not found: git")
 	}
@@ -78,7 +79,7 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 		MinRAMMB:    1024,
 		MinDiskGB:   10,
 	}
-	hw, hwErr := DetectHardware()
+	hw, hwErr := DetectHardwareOn(system)
 	if hwErr == nil {
 		result.Hardware = hw
 		result.HardwareReqs = reqs
@@ -86,9 +87,9 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context) (*PreflightRes
 	}
 
 	// Check root — flag for sudo/doas relaunch option.
-	if !IsRoot() {
+	if !system.IsRoot() {
 		result.NeedsRoot = true
-		result.Escalation = DetectEscalation()
+		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
 	}
 

@@ -75,6 +75,83 @@ func TestConfigExtra(t *testing.T) {
 	}
 }
 
+// TestTargetValidate verifies supported target modes and SSH requirements.
+func TestTargetValidate(t *testing.T) {
+	tests := []struct {
+		name     string
+		target   Target
+		wantErr  string
+		wantPort int
+	}{
+		{
+			name:     "zero value defaults to local",
+			target:   Target{},
+			wantPort: 0,
+		},
+		{
+			name:     "ssh defaults port 22",
+			target:   Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu"},
+			wantPort: 22,
+		},
+		{
+			name:     "ssh requires host",
+			target:   Target{Mode: TargetModeSSH, User: "ubuntu"},
+			wantErr:  "target host is required",
+			wantPort: 22,
+		},
+		{
+			name:     "ssh requires user",
+			target:   Target{Mode: TargetModeSSH, Host: "192.0.2.10"},
+			wantErr:  "target user is required",
+			wantPort: 22,
+		},
+		{
+			name:     "reject unsupported mode",
+			target:   Target{Mode: TargetMode("serial-console")},
+			wantErr:  "unsupported target mode",
+			wantPort: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := tt.target
+			err := target.Validate()
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if target.Port != tt.wantPort {
+				t.Fatalf("Port = %d, want %d", target.Port, tt.wantPort)
+			}
+		})
+	}
+}
+
+// TestConfigValidateRejectsInvalidTarget verifies target validation is part of
+// the common config validation path.
+func TestConfigValidateRejectsInvalidTarget(t *testing.T) {
+	cfg := Config{
+		SonarURL: "https://myisp.sonar.software",
+		Target:   Target{Mode: TargetModeSSH, Host: "192.0.2.10"},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected target validation error, got nil")
+	}
+	if !contains(err.Error(), "target user is required") {
+		t.Fatalf("error = %q, want target validation failure", err.Error())
+	}
+}
+
 // TestParseOSRelease verifies parsing of /etc/os-release content across
 // multiple distros, edge cases (comments, blank lines, unquoted values),
 // and malformed input.

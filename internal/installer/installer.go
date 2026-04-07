@@ -14,6 +14,61 @@ import (
 	"strings"
 )
 
+// TargetMode identifies where installation work will run.
+type TargetMode string
+
+const (
+	// TargetModeLocal runs installation on the same host as STUI.
+	TargetModeLocal TargetMode = "local"
+	// TargetModeSSH runs installation on a remote host over SSH.
+	TargetModeSSH TargetMode = "ssh"
+)
+
+// Target describes the execution host for preflight, install, and verify.
+type Target struct {
+	// Mode selects how STUI should reach the target host.
+	Mode TargetMode
+	// Host is the SSH hostname or IP when Mode is ssh.
+	Host string
+	// User is the SSH username when Mode is ssh.
+	User string
+	// Port is the SSH port when Mode is ssh. Zero means use the default.
+	Port int
+}
+
+// Normalize applies defaults so a zero-value Target behaves like localhost.
+func (t *Target) Normalize() {
+	if t.Mode == "" {
+		t.Mode = TargetModeLocal
+	}
+	if t.Mode == TargetModeSSH && t.Port == 0 {
+		t.Port = 22
+	}
+}
+
+// Validate checks that the target configuration is internally consistent.
+func (t *Target) Validate() error {
+	t.Normalize()
+
+	switch t.Mode {
+	case TargetModeLocal:
+		return nil
+	case TargetModeSSH:
+		if t.Host == "" {
+			return fmt.Errorf("target host is required for ssh mode")
+		}
+		if t.User == "" {
+			return fmt.Errorf("target user is required for ssh mode")
+		}
+		if t.Port < 0 || t.Port > 65535 {
+			return fmt.Errorf("target port must be between 0 and 65535")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported target mode %q", t.Mode)
+	}
+}
+
 // Step represents a single installation step with a name and action.
 type Step struct {
 	Name   string
@@ -51,12 +106,21 @@ type Config struct {
 	// PollerAPIKey is the Sonar API key used by the Poller agent (Poller only).
 	PollerAPIKey string
 
+	// Target identifies where STUI should execute the install workflow.
+	// The zero value means localhost.
+	Target Target
+
 	// Extra holds any additional key-value pairs for future or custom config.
 	Extra map[string]string
 }
 
 // Validate checks that required common fields are set and well-formed.
 func (c *Config) Validate() error {
+	c.Target.Normalize()
+	if err := c.Target.Validate(); err != nil {
+		return fmt.Errorf("target: %w", err)
+	}
+
 	if c.SonarURL == "" {
 		return fmt.Errorf("sonar URL is required")
 	}
@@ -236,7 +300,7 @@ type ReadFileFunc func(path string) ([]byte, error)
 
 // DetectOS reads /etc/os-release to determine the operating system.
 func DetectOS() (*OSInfo, error) {
-	return DetectOSWith(os.ReadFile)
+	return DetectOSOn(NewLocalSystem())
 }
 
 // DetectOSWith reads /etc/os-release using the provided file reader.
@@ -262,6 +326,11 @@ func DetectOSWith(readFile ReadFileFunc) (*OSInfo, error) {
 	}
 
 	return info, nil
+}
+
+// DetectOSOn reads /etc/os-release through the provided system abstraction.
+func DetectOSOn(system System) (*OSInfo, error) {
+	return DetectOSWith(system.ReadFile)
 }
 
 // ParseOSRelease extracts ID, VERSION_ID, and PRETTY_NAME from os-release content.
@@ -306,6 +375,11 @@ func CommandExists(name string) bool {
 func CommandExistsWith(name string, lookPath LookPathFunc) bool {
 	_, err := lookPath(name)
 	return err == nil
+}
+
+// CommandExistsOn checks if a command exists through the provided system abstraction.
+func CommandExistsOn(system System, name string) bool {
+	return CommandExistsWith(name, system.LookPath)
 }
 
 // Registry maps application identifiers to their installer constructors.

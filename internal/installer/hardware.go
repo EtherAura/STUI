@@ -5,7 +5,6 @@ package installer
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -35,7 +34,7 @@ type HardwareInfo struct {
 
 // DetectHardware reads system hardware information from the Linux host.
 func DetectHardware() (*HardwareInfo, error) {
-	return DetectHardwareWith(os.ReadFile, statfsFunc)
+	return DetectHardwareOn(NewLocalSystem())
 }
 
 // StatfsFunc is a function that performs a statfs call on a path.
@@ -68,6 +67,27 @@ func DetectHardwareWith(readFile ReadFileFunc, statfs StatfsFunc) (*HardwareInfo
 		return nil, fmt.Errorf("statfs /: %w", err)
 	}
 	// Available blocks * block size, converted to gigabytes.
+	info.DiskFreeGB = int(stat.Bavail * uint64(stat.Bsize) / (1024 * 1024 * 1024))
+
+	return info, nil
+}
+
+// DetectHardwareOn reads system hardware through the provided system abstraction.
+func DetectHardwareOn(system System) (*HardwareInfo, error) {
+	info := &HardwareInfo{}
+
+	info.CPUCores = system.NumCPU()
+
+	memData, err := system.ReadFile("/proc/meminfo")
+	if err != nil {
+		return nil, fmt.Errorf("reading /proc/meminfo: %w", err)
+	}
+	info.RAMMB = parseMemTotalMB(string(memData))
+
+	var stat unix.Statfs_t
+	if err := system.Statfs("/", &stat); err != nil {
+		return nil, fmt.Errorf("statfs /: %w", err)
+	}
 	info.DiskFreeGB = int(stat.Bavail * uint64(stat.Bsize) / (1024 * 1024 * 1024))
 
 	return info, nil
