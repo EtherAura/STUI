@@ -33,3 +33,6 @@ Thumbs.db
 # Test output
 coverage.out
 *.test
+
+# Dolt database files (added by bd init)
+*.db
