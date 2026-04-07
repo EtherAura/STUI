@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -256,12 +257,33 @@ func hostKeyCallback() ssh.HostKeyCallback {
 	if err == nil {
 		knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
 		if _, statErr := os.Stat(knownHostsPath); statErr == nil {
-			if callback, callbackErr := knownhosts.New(knownHostsPath); callbackErr == nil {
+			if callback, callbackErr := knownHostsCallback(knownHostsPath); callbackErr == nil {
 				return callback
 			}
 		}
 	}
 	return ssh.InsecureIgnoreHostKey()
+}
+
+func knownHostsCallback(path string) (ssh.HostKeyCallback, error) {
+	callback, err := knownhosts.New(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := callback(hostname, remote, key)
+		if err == nil {
+			return nil
+		}
+
+		var keyErr *knownhosts.KeyError
+		if errors.As(err, &keyErr) && len(keyErr.Want) == 0 {
+			return nil
+		}
+
+		return err
+	}, nil
 }
 
 func expandPath(path string) (string, error) {
