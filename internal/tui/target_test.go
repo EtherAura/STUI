@@ -82,11 +82,32 @@ func TestTargetModelProceedRowForSSH(t *testing.T) {
 	m := NewTargetModel(installer.AppPoller)
 	m.mode = installer.TargetModeSSH
 
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 8; i++ {
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
 
 	if !m.isProceedRow() {
 		t.Fatalf("expected focus on Proceed row, got index %d", m.FocusIndex())
+	}
+}
+
+func TestTargetModelBuildTargetIncludesSSHAuthFields(t *testing.T) {
+	m := NewTargetModel(installer.AppPoller)
+	m.mode = installer.TargetModeSSH
+	m.inputs[1].SetValue("ubuntu")
+	m.inputs[2].SetValue("192.168.0.132")
+	m.inputs[3].SetValue("22")
+	m.inputs[4].SetValue("secret")
+	m.inputs[5].SetValue("~/.ssh/id_ed25519")
+
+	target, err := m.buildTarget()
+	if err != nil {
+		t.Fatalf("buildTarget() error = %v", err)
+	}
+	if target.Password != "secret" {
+		t.Fatalf("Password = %q, want %q", target.Password, "secret")
+	}
+	if target.KeyPath != "~/.ssh/id_ed25519" {
+		t.Fatalf("KeyPath = %q, want %q", target.KeyPath, "~/.ssh/id_ed25519")
 	}
 }

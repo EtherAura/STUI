@@ -34,6 +34,8 @@ var targetFields = []targetField{
 	{key: "user", label: "SSH Username", placeholder: "ubuntu"},
 	{key: "host", label: "SSH Host", placeholder: "192.168.0.10"},
 	{key: "port", label: "SSH Port", placeholder: "22"},
+	{key: "password", label: "SSH Password", placeholder: "password"},
+	{key: "key_path", label: "SSH Key Path", placeholder: "~/.ssh/id_ed25519"},
 }
 
 // TargetModel collects the install target before preflight starts.
@@ -59,6 +61,9 @@ func NewTargetModel(appID string) TargetModel {
 		switch f.key {
 		case "port":
 			ti.SetValue("22")
+		case "password":
+			ti.EchoMode = textinput.EchoPassword
+			ti.EchoCharacter = '•'
 		}
 		if i == 0 {
 			// Focus is visual-only for the mode selector.
@@ -193,6 +198,8 @@ func (m TargetModel) buildTarget() (installer.Target, error) {
 			}
 			target.Port = port
 		}
+		target.Password = m.inputs[4].Value()
+		target.KeyPath = strings.TrimSpace(m.inputs[5].Value())
 	}
 
 	if err := target.Validate(); err != nil {
@@ -218,6 +225,8 @@ func (m TargetModel) View() string {
 	b.WriteString("\n\n")
 
 	if m.mode == installer.TargetModeSSH {
+		b.WriteString(DimStyle.Render("Provide an SSH password, a private key path, or leave both empty to use agent/default keys."))
+		b.WriteString("\n\n")
 		for i, f := range m.fields[1:] {
 			rowIndex := i + 3
 			if rowIndex == m.focusIndex {
@@ -276,7 +285,7 @@ func (m *TargetModel) selectFocusedOption() {
 
 func (m TargetModel) rowCount() int {
 	if m.mode == installer.TargetModeSSH {
-		return 7
+		return 9
 	}
 	return 4
 }
@@ -286,7 +295,7 @@ func (m TargetModel) isOptionRow() bool {
 }
 
 func (m TargetModel) isInputRow() bool {
-	return m.mode == installer.TargetModeSSH && m.focusIndex >= 3 && m.focusIndex <= 5
+	return m.mode == installer.TargetModeSSH && m.focusIndex >= 3 && m.focusIndex <= 7
 }
 
 func (m TargetModel) isProceedRow() bool {
@@ -301,6 +310,10 @@ func (m TargetModel) inputIndex() int {
 		return 2
 	case 5:
 		return 3
+	case 6:
+		return 4
+	case 7:
+		return 5
 	default:
 		return 0
 	}

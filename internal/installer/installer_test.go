@@ -94,6 +94,16 @@ func TestTargetValidate(t *testing.T) {
 			wantPort: 22,
 		},
 		{
+			name:     "ssh accepts password auth fields",
+			target:   Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu", Password: "secret"},
+			wantPort: 22,
+		},
+		{
+			name:     "ssh accepts key path auth fields",
+			target:   Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu", KeyPath: "~/.ssh/id_ed25519"},
+			wantPort: 22,
+		},
+		{
 			name:     "ssh requires host",
 			target:   Target{Mode: TargetModeSSH, User: "ubuntu"},
 			wantErr:  "target host is required",

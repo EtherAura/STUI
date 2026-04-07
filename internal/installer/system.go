@@ -2,12 +2,18 @@ package installer
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/crypto/ssh/knownhosts"
 	"golang.org/x/sys/unix"
 )
 
@@ -134,15 +140,19 @@ func (s sshSystem) Statfs(path string, buf *unix.Statfs_t) error {
 }
 
 func (s sshSystem) run(script string) ([]byte, error) {
-	args := []string{
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=10",
-		"-p", strconv.Itoa(s.target.Port),
-		fmt.Sprintf("%s@%s", s.target.User, s.target.Host),
-		"sh", "-lc", script,
+	client, err := s.client()
+	if err != nil {
+		return nil, err
 	}
+	defer client.Close()
 
-	out, err := exec.Command("ssh", args...).CombinedOutput()
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("starting ssh session: %w", err)
+	}
+	defer session.Close()
+
+	out, err := session.CombinedOutput("sh -lc " + shellQuote(script))
 	if err != nil {
 		msg := strings.TrimSpace(string(out))
 		if msg == "" {
@@ -151,6 +161,124 @@ func (s sshSystem) run(script string) ([]byte, error) {
 		return nil, fmt.Errorf("%v: %s", err, msg)
 	}
 	return out, nil
+}
+
+func (s sshSystem) client() (*ssh.Client, error) {
+	config, err := s.clientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	address := net.JoinHostPort(s.target.Host, strconv.Itoa(s.target.Port))
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := dialer.Dial("tcp", address)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to ssh target: %w", err)
+	}
+
+	clientConn, chans, reqs, err := ssh.NewClientConn(conn, address, config)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("ssh handshake failed: %w", err)
+	}
+
+	return ssh.NewClient(clientConn, chans, reqs), nil
+}
+
+func (s sshSystem) clientConfig() (*ssh.ClientConfig, error) {
+	auth, err := s.authMethods()
+	if err != nil {
+		return nil, err
+	}
+	if len(auth) == 0 {
+		return nil, fmt.Errorf("no ssh authentication method available")
+	}
+
+	return &ssh.ClientConfig{
+		User:            s.target.User,
+		Auth:            auth,
+		HostKeyCallback: hostKeyCallback(),
+		Timeout:         10 * time.Second,
+	}, nil
+}
+
+func (s sshSystem) authMethods() ([]ssh.AuthMethod, error) {
+	var methods []ssh.AuthMethod
+
+	if s.target.Password != "" {
+		methods = append(methods, ssh.Password(s.target.Password))
+	}
+
+	if s.target.KeyPath != "" {
+		signer, err := signerFromPath(s.target.KeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("loading ssh key: %w", err)
+		}
+		methods = append(methods, ssh.PublicKeys(signer))
+	}
+
+	if len(methods) > 0 {
+		return methods, nil
+	}
+
+	if sock := os.Getenv("SSH_AUTH_SOCK"); sock != "" {
+		conn, err := net.Dial("unix", sock)
+		if err == nil {
+			agentClient := agent.NewClient(conn)
+			methods = append(methods, ssh.PublicKeysCallback(agentClient.Signers))
+		}
+	}
+
+	for _, candidate := range []string{"~/.ssh/id_ed25519", "~/.ssh/id_rsa"} {
+		signer, err := signerFromPath(candidate)
+		if err == nil {
+			methods = append(methods, ssh.PublicKeys(signer))
+		}
+	}
+
+	return methods, nil
+}
+
+func signerFromPath(path string) (ssh.Signer, error) {
+	expanded, err := expandPath(path)
+	if err != nil {
+		return nil, err
+	}
+	key, err := os.ReadFile(expanded)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.ParsePrivateKey(key)
+}
+
+func hostKeyCallback() ssh.HostKeyCallback {
+	home, err := os.UserHomeDir()
+	if err == nil {
+		knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
+		if _, statErr := os.Stat(knownHostsPath); statErr == nil {
+			if callback, callbackErr := knownhosts.New(knownHostsPath); callbackErr == nil {
+				return callback
+			}
+		}
+	}
+	return ssh.InsecureIgnoreHostKey()
+}
+
+func expandPath(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		if path == "~" {
+			return home, nil
+		}
+		return filepath.Join(home, path[2:]), nil
+	}
+	return path, nil
 }
 
 func shellQuote(value string) string {

@@ -34,6 +34,10 @@ type Target struct {
 	User string
 	// Port is the SSH port when Mode is ssh. Zero means use the default.
 	Port int
+	// Password is the SSH password when using password-based auth.
+	Password string
+	// KeyPath is the path to a private key file for key-based auth.
+	KeyPath string
 }
 
 // Display returns a human-readable summary of the target.
