@@ -71,6 +71,7 @@ type PreflightModel struct {
 // instantiating the installer from the registry. The provided context
 // allows the caller to cancel the preflight check on navigation.
 func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string, target installer.Target) PreflightModel {
+	target.Normalize()
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = BannerStyle
@@ -137,7 +138,8 @@ func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 				}
 			case "s":
 				// Offer escalation relaunch when not running as root.
-				if m.result != nil && m.result.NeedsRoot && m.result.Escalation != nil {
+				if m.target.Mode == installer.TargetModeLocal &&
+					m.result != nil && m.result.NeedsRoot && m.result.Escalation != nil {
 					esc := m.result.Escalation
 					appID := m.appID
 					return m, func() tea.Msg {
@@ -271,7 +273,7 @@ func (m PreflightModel) View() string {
 		}
 
 		// Escalation relaunch option when not running as root.
-		if m.result.NeedsRoot {
+		if m.target.Mode == installer.TargetModeLocal && m.result.NeedsRoot {
 			if m.result.Escalation != nil {
 				b.WriteString(WarningStyle.Render(
 					fmt.Sprintf("Press s to restart with %s", m.result.Escalation.Name)))

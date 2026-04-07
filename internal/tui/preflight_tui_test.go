@@ -465,6 +465,29 @@ func TestPreflightElevateKeyIgnoredWhenRoot(t *testing.T) {
 	}
 }
 
+// TestPreflightElevateKeyIgnoredForRemoteTarget verifies pressing 's' does
+// nothing for remote targets, even if a result incorrectly reports NeedsRoot.
+func TestPreflightElevateKeyIgnoredForRemoteTarget(t *testing.T) {
+	reg := installer.NewRegistry()
+	m := NewPreflightModel(context.Background(), reg, installer.AppCustomerPortal, installer.Target{
+		Mode: installer.TargetModeSSH,
+		Host: "192.168.0.132",
+		User: "ubuntu",
+	})
+	esc := &installer.EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"}
+	m, _ = m.Update(PreflightDoneMsg{Result: &installer.PreflightResult{
+		Passed:     true,
+		OS:         "ubuntu",
+		NeedsRoot:  true,
+		Escalation: esc,
+	}})
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd != nil {
+		t.Error("pressing 's' should be ignored for remote targets")
+	}
+}
+
 // TestPreflightViewNeedsRoot verifies the view shows an escalation relaunch
 // option when NeedsRoot is set with a detected escalation method.
 func TestPreflightViewNeedsRoot(t *testing.T) {

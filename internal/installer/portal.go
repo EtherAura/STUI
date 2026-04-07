@@ -51,6 +51,7 @@ func (p *PortalInstaller) HardwareRequirements() HardwareReqs {
 // PreflightCheck verifies the host meets Customer Portal requirements:
 // Ubuntu OS, git and curl available, and root access.
 func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
+	target.Normalize()
 	result := &PreflightResult{Passed: true}
 	system, err := SystemForTarget(target)
 	if err != nil {
@@ -97,8 +98,9 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*P
 		result.Warnings = append(result.Warnings, CheckHardware(hw, reqs)...)
 	}
 
-	// Check root — flag for sudo/doas relaunch option.
-	if !system.IsRoot() {
+	// Local installs may relaunch STUI with local privilege escalation.
+	// Remote targets should not trigger a local sudo/doas restart.
+	if target.Mode == TargetModeLocal && !system.IsRoot() {
 		result.NeedsRoot = true
 		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
