@@ -1,8 +1,10 @@
 package installer
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -27,6 +29,10 @@ type System interface {
 	DetectEscalation() *EscalationMethod
 	NumCPU() int
 	Statfs(path string, buf *unix.Statfs_t) error
+	// RunCmd executes a shell command, streaming combined stdout/stderr
+	// to output. The command is passed to sh -c for local targets or
+	// sh -lc for SSH targets. Context cancellation terminates the command.
+	RunCmd(ctx context.Context, command string, output io.Writer) error
 }
 
 type localSystem struct{}
@@ -58,6 +64,15 @@ func (localSystem) NumCPU() int {
 
 func (localSystem) Statfs(path string, buf *unix.Statfs_t) error {
 	return unix.Statfs(path, buf)
+}
+
+// RunCmd executes a shell command locally via sh -c, streaming
+// combined stdout and stderr to the provided writer.
+func (localSystem) RunCmd(ctx context.Context, command string, output io.Writer) error {
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd.Stdout = output
+	cmd.Stderr = output
+	return cmd.Run()
 }
 
 // SystemForTarget returns a host abstraction for the requested target.
@@ -115,6 +130,39 @@ func (s sshSystem) NumCPU() int {
 	return count
 }
 
+// RunCmd executes a shell command on the remote host over SSH,
+// streaming combined stdout and stderr to the provided writer.
+func (s sshSystem) RunCmd(ctx context.Context, command string, output io.Writer) error {
+	client, err := s.client()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("starting ssh session: %w", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	session.Stdout = output
+	session.Stderr = output
+
+	done := make(chan error, 1)
+	go func() {
+		done <- session.Run("sh -lc " + shellQuote(command))
+	}()
+
+	select {
+	case <-ctx.Done():
+		_ = session.Signal(ssh.SIGTERM)
+		_ = session.Close()
+		return ctx.Err()
+	case err := <-done:
+		return err
+	}
+}
+
 func (s sshSystem) Statfs(path string, buf *unix.Statfs_t) error {
 	out, err := s.run("stat -fc '%a %S' " + shellQuote(path))
 	if err != nil {
@@ -145,13 +193,13 @@ func (s sshSystem) run(script string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	session, err := client.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("starting ssh session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	out, err := session.CombinedOutput("sh -lc " + shellQuote(script))
 	if err != nil {
@@ -159,7 +207,7 @@ func (s sshSystem) run(script string) ([]byte, error) {
 		if msg == "" {
 			return nil, err
 		}
-		return nil, fmt.Errorf("%v: %s", err, msg)
+		return nil, fmt.Errorf("%w: %s", err, msg)
 	}
 	return out, nil
 }

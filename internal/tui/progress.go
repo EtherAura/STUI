@@ -5,7 +5,6 @@
 package tui
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -66,6 +65,9 @@ type ProgressModel struct {
 	viewport viewport.Model
 	// output accumulates all output text.
 	output *strings.Builder
+	// msgCh receives step, output, and done messages from the
+	// installer goroutine during execution.
+	msgCh chan tea.Msg
 	// currentStep is the name of the step currently executing.
 	currentStep string
 	// stepIndex is the zero-based index of the current step.
@@ -112,6 +114,7 @@ func NewProgressModel(ctx context.Context, reg installer.Registry, appID string,
 		progress:   p,
 		viewport:   vp,
 		output:     &strings.Builder{},
+		msgCh:      make(chan tea.Msg, 256),
 		totalSteps: totalSteps,
 		running:    true,
 	}
@@ -126,44 +129,98 @@ func (m ProgressModel) Init() tea.Cmd {
 	)
 }
 
-// runInstall returns a tea.Cmd that executes the installer and
-// sends step/output/done messages as installation progresses.
+// runInstall returns a tea.Cmd that starts the installer goroutine
+// and waits for the first message. The goroutine drives step iteration,
+// sending InstallStepMsg, InstallOutputMsg (via chanWriter), and a
+// final InstallDoneMsg through msgCh.
 func (m ProgressModel) runInstall() tea.Cmd {
+	ch := m.msgCh
 	inst := m.inst
 	cfg := m.cfg
 	appID := m.appID
 	ctx := m.ctx
 	return func() tea.Msg {
-		if inst == nil {
-			return InstallDoneMsg{Err: fmt.Errorf("no installer for app %q", appID)}
+		go func() {
+			defer close(ch)
+
+			if inst == nil {
+				ch <- InstallDoneMsg{Err: fmt.Errorf("no installer for app %q", appID)}
+				return
+			}
+
+			if err := cfg.Validate(); err != nil {
+				ch <- InstallDoneMsg{Err: fmt.Errorf("invalid config: %w", err)}
+				return
+			}
+
+			steps := inst.Steps()
+			writer := &chanWriter{ch: ch, ctx: ctx}
+
+			for i, step := range steps {
+				select {
+				case <-ctx.Done():
+					ch <- InstallDoneMsg{Err: ctx.Err()}
+					return
+				case ch <- InstallStepMsg{StepIndex: i, StepName: step.Name, TotalSteps: len(steps)}:
+				}
+
+				if err := step.Action(ctx, cfg, writer); err != nil {
+					ch <- InstallDoneMsg{Err: fmt.Errorf("step %q: %w", step.Name, err)}
+					return
+				}
+			}
+
+			ch <- InstallDoneMsg{Err: nil}
+		}()
+
+		// Block until the first message arrives.
+		msg, ok := <-ch
+		if !ok {
+			return InstallDoneMsg{Err: nil}
 		}
-
-		// Use a buffer to capture output. In a full implementation,
-		// this would stream via a pipe with goroutine forwarding.
-		var buf bytes.Buffer
-		err := inst.Install(ctx, cfg, &buf)
-
-		// Send the final output and done message.
-		// Note: In production, we'd send InstallOutputMsg chunks during
-		// execution via a custom io.Writer that posts tea.Msg.
-		return InstallDoneMsg{Err: err}
+		return msg
 	}
 }
 
-// msgWriter is an io.Writer that sends output chunks as tea.Msg.
-// This is used for streaming install output into the TUI.
-type msgWriter struct {
-	send func(tea.Msg)
+// waitForInstallMsg returns a tea.Cmd that blocks until the next
+// message arrives on the channel. Used to keep the listener active
+// after each received message.
+func waitForInstallMsg(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return InstallDoneMsg{Err: nil}
+		}
+		return msg
+	}
 }
 
-// Write implements io.Writer by sending InstallOutputMsg.
-func (w *msgWriter) Write(p []byte) (int, error) {
-	w.send(InstallOutputMsg{Output: string(p)})
-	return len(p), nil
+// chanWriter is an io.Writer that sends output chunks as
+// InstallOutputMsg through a channel. Used to stream real-time
+// install output into the TUI viewport.
+type chanWriter struct {
+	// ch is the message channel shared with the progress model.
+	ch chan<- tea.Msg
+	// ctx allows aborting writes when the install is cancelled.
+	ctx context.Context
 }
 
-// Ensure msgWriter satisfies io.Writer.
-var _ io.Writer = (*msgWriter)(nil)
+// Write implements io.Writer by sending InstallOutputMsg on the channel.
+// Returns a context error if the installation has been cancelled.
+func (w *chanWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	select {
+	case <-w.ctx.Done():
+		return 0, w.ctx.Err()
+	case w.ch <- InstallOutputMsg{Output: string(p)}:
+		return len(p), nil
+	}
+}
+
+// Ensure chanWriter satisfies io.Writer.
+var _ io.Writer = (*chanWriter)(nil)
 
 // Update implements tea.Model. Handles install progress messages,
 // spinner ticks, and navigation keys.
@@ -173,7 +230,7 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		m.output.WriteString(msg.Output)
 		m.viewport.SetContent(m.output.String())
 		m.viewport.GotoBottom()
-		return m, nil
+		return m, waitForInstallMsg(m.msgCh)
 	case InstallStepMsg:
 		m.stepIndex = msg.StepIndex
 		m.currentStep = msg.StepName
@@ -182,7 +239,7 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		m.output.WriteString(line)
 		m.viewport.SetContent(m.output.String())
 		m.viewport.GotoBottom()
-		return m, nil
+		return m, waitForInstallMsg(m.msgCh)
 	case InstallDoneMsg:
 		m.running = false
 		m.done = true

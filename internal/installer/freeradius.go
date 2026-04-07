@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // FreeRADIUSInstaller handles installation of FreeRADIUS Genie v3.
@@ -133,20 +134,44 @@ func (f *FreeRADIUSInstaller) Verify(ctx context.Context) error {
 }
 
 // cloneRepo clones the freeradius_genie-v3 repository from GitHub.
+// If the directory already exists it pulls the latest changes instead.
 func (f *FreeRADIUSInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: git clone https://github.com/SonarSoftwareInc/freeradius_genie-v3.git
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "freeradius_genie-v3")
+	cmd := fmt.Sprintf(
+		`if [ -d %[1]s/.git ]; then echo "Repository exists, pulling latest..." && cd %[1]s && git pull; else git clone https://github.com/SonarSoftwareInc/freeradius_genie-v3.git %[1]s; fi`,
+		shellQuote(dir),
+	)
+	return sys.RunCmd(ctx, cmd, output)
 }
 
 // configureEnv creates the .env file from .env.example and populates
 // it with user-supplied values for the FreeRADIUS configuration.
 func (f *FreeRADIUSInstaller) configureEnv(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: copy .env.example to .env and populate
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "freeradius_genie-v3")
+
+	var env strings.Builder
+	fmt.Fprintf(&env, "SONAR_URL=%s\n", cfg.SonarURL)
+
+	envPath := dir + "/.env"
+	cmd := fmt.Sprintf("printf '%%s' %s > %s", shellQuote(env.String()), shellQuote(envPath))
+	_, _ = fmt.Fprintf(output, "  Writing %s\n", envPath)
+	return sys.RunCmd(ctx, cmd, output)
 }
 
 // runGenie executes the genie CLI to complete FreeRADIUS setup.
 func (f *FreeRADIUSInstaller) runGenie(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: ./genie
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "freeradius_genie-v3")
+	return sys.RunCmd(ctx, fmt.Sprintf("cd %s && chmod +x genie && ./genie", shellQuote(dir)), output)
 }

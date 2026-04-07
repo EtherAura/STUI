@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // NetflowInstaller handles installation of Netflow On-Prem.
@@ -147,25 +148,66 @@ func (n *NetflowInstaller) Verify(ctx context.Context) error {
 
 // installPrereqs installs system packages needed by netflow (git, make, unzip).
 func (n *NetflowInstaller) installPrereqs(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: apt-get install git make unzip
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	return sys.RunCmd(ctx, "apt-get update -y && apt-get install -y git make unzip", output)
 }
 
 // cloneRepo clones the netflow-onprem repository from GitHub.
+// If the directory already exists it pulls the latest changes instead.
 func (n *NetflowInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: git clone https://github.com/SonarSoftwareInc/netflow-onprem.git
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "netflow-onprem")
+	cmd := fmt.Sprintf(
+		`if [ -d %[1]s/.git ]; then echo "Repository exists, pulling latest..." && cd %[1]s && git pull; else git clone https://github.com/SonarSoftwareInc/netflow-onprem.git %[1]s; fi`,
+		shellQuote(dir),
+	)
+	return sys.RunCmd(ctx, cmd, output)
 }
 
 // configureEnv creates the .env file from .env.example and populates
 // it with user-supplied values (API token, public IP, etc.).
 func (n *NetflowInstaller) configureEnv(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: copy .env.example to .env and populate values
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "netflow-onprem")
+
+	var env strings.Builder
+	fmt.Fprintf(&env, "SONAR_URL=%s\n", cfg.SonarURL)
+	fmt.Fprintf(&env, "API_TOKEN=%s\n", cfg.APIToken)
+	if cfg.NetflowName != "" {
+		fmt.Fprintf(&env, "NAME=%s\n", cfg.NetflowName)
+	}
+	fmt.Fprintf(&env, "PUBLIC_IP=%s\n", cfg.PublicIP)
+	if cfg.DBPassword != "" {
+		fmt.Fprintf(&env, "DB_PASSWORD=%s\n", cfg.DBPassword)
+	}
+	if cfg.MaxLife != "" {
+		fmt.Fprintf(&env, "MAX_LIFE=%s\n", cfg.MaxLife)
+	}
+	if cfg.MaxSize != "" {
+		fmt.Fprintf(&env, "MAX_SIZE=%s\n", cfg.MaxSize)
+	}
+
+	envPath := dir + "/.env"
+	cmd := fmt.Sprintf("printf '%%s' %s > %s", shellQuote(env.String()), shellQuote(envPath))
+	_, _ = fmt.Fprintf(output, "  Writing %s\n", envPath)
+	return sys.RunCmd(ctx, cmd, output)
 }
 
 // runInstall executes the netflow Docker-based install script.
 func (n *NetflowInstaller) runInstall(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: chmod +x ./install.sh && sudo ./install.sh
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "netflow-onprem")
+	return sys.RunCmd(ctx, fmt.Sprintf("cd %s && chmod +x install.sh && ./install.sh", shellQuote(dir)), output)
 }

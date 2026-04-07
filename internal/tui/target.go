@@ -66,7 +66,8 @@ func NewTargetModel(appID string) TargetModel {
 			ti.EchoCharacter = '•'
 		}
 		if i == 0 {
-			// Focus is visual-only for the mode selector.
+			// Focus is visual-only for the mode selector; no-op.
+			_ = i
 		}
 		inputs[i] = ti
 	}

@@ -37,8 +37,8 @@ func TestNewProgressModel(t *testing.T) {
 	if m.Done() {
 		t.Error("new progress model should not be done")
 	}
-	if m.totalSteps != 3 {
-		t.Errorf("portal should have 3 steps, got %d", m.totalSteps)
+	if m.totalSteps != 4 {
+		t.Errorf("portal should have 4 steps, got %d", m.totalSteps)
 	}
 }
 

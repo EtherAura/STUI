@@ -41,11 +41,6 @@ func DetectHardware() (*HardwareInfo, error) {
 // Allows dependency injection for testing.
 type StatfsFunc func(path string, buf *unix.Statfs_t) error
 
-// statfsFunc is the default production statfs implementation.
-func statfsFunc(path string, buf *unix.Statfs_t) error {
-	return unix.Statfs(path, buf)
-}
-
 // DetectHardwareWith reads system hardware using injected dependencies.
 // This allows tests to provide fake file contents and statfs results.
 func DetectHardwareWith(readFile ReadFileFunc, statfs StatfsFunc) (*HardwareInfo, error) {

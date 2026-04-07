@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // PortalInstaller handles installation of the Sonar Customer Portal.
@@ -114,6 +115,7 @@ func (p *PortalInstaller) Steps() []Step {
 	return []Step{
 		{Name: "Install prerequisites", Action: p.installPrereqs},
 		{Name: "Clone repository", Action: p.cloneRepo},
+		{Name: "Configure environment", Action: p.configureEnv},
 		{Name: "Run install script", Action: p.runInstall},
 	}
 }
@@ -145,18 +147,55 @@ func (p *PortalInstaller) Verify(ctx context.Context) error {
 
 // installPrereqs installs system packages needed by the portal (git, unzip).
 func (p *PortalInstaller) installPrereqs(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: apt-get install git unzip
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	return sys.RunCmd(ctx, "apt-get update -y && apt-get install -y git unzip", output)
 }
 
 // cloneRepo clones the customer_portal repository from GitHub.
+// If the directory already exists it pulls the latest changes instead.
 func (p *PortalInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: git clone https://github.com/SonarSoftwareInc/customer_portal.git
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "customer_portal")
+	cmd := fmt.Sprintf(
+		`if [ -d %[1]s/.git ]; then echo "Repository exists, pulling latest..." && cd %[1]s && git pull; else git clone https://github.com/SonarSoftwareInc/customer_portal.git %[1]s; fi`,
+		shellQuote(dir),
+	)
+	return sys.RunCmd(ctx, cmd, output)
+}
+
+// configureEnv creates the .env file with user-supplied portal values.
+func (p *PortalInstaller) configureEnv(ctx context.Context, cfg *Config, output io.Writer) error {
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "customer_portal")
+
+	var env strings.Builder
+	fmt.Fprintf(&env, "SONAR_URL=%s\n", cfg.SonarURL)
+	fmt.Fprintf(&env, "API_USERNAME=%s\n", cfg.APIUsername)
+	fmt.Fprintf(&env, "API_PASSWORD=%s\n", cfg.APIPassword)
+	fmt.Fprintf(&env, "PORTAL_DOMAIN=%s\n", cfg.Domain)
+	fmt.Fprintf(&env, "ADMIN_EMAIL=%s\n", cfg.Email)
+
+	envPath := dir + "/.env"
+	cmd := fmt.Sprintf("printf '%%s' %s > %s", shellQuote(env.String()), shellQuote(envPath))
+	_, _ = fmt.Fprintf(output, "  Writing %s\n", envPath)
+	return sys.RunCmd(ctx, cmd, output)
 }
 
 // runInstall executes the portal's Docker-based install script.
 func (p *PortalInstaller) runInstall(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: sudo ./install.sh
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	dir := repoDir(cfg, "customer_portal")
+	return sys.RunCmd(ctx, fmt.Sprintf("cd %s && chmod +x install.sh && ./install.sh", shellQuote(dir)), output)
 }

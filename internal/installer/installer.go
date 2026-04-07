@@ -119,6 +119,10 @@ type Config struct {
 	// PollerAPIKey is the Sonar API key used by the Poller agent (Poller only).
 	PollerAPIKey string
 
+	// InstallDir is the parent directory where repositories are cloned.
+	// Defaults to DefaultInstallDir ("/opt") when empty.
+	InstallDir string
+
 	// Target identifies where STUI should execute the install workflow.
 	// The zero value means localhost.
 	Target Target
@@ -408,6 +412,9 @@ const (
 	AppFreeRADIUS = "freeradius-genie"
 	// AppPoller is the registry key for the Poller installer.
 	AppPoller = "poller"
+
+	// DefaultInstallDir is the default parent directory for cloned repositories.
+	DefaultInstallDir = "/opt"
 )
 
 // NewRegistry returns a registry with all supported installers.
@@ -428,4 +435,14 @@ func (r Registry) List() []string {
 		AppFreeRADIUS,
 		AppPoller,
 	}
+}
+
+// repoDir returns the full path for a repository clone given the
+// user config and repo name. Falls back to DefaultInstallDir.
+func repoDir(cfg *Config, repoName string) string {
+	base := cfg.InstallDir
+	if base == "" {
+		base = DefaultInstallDir
+	}
+	return strings.TrimRight(base, "/") + "/" + repoName
 }

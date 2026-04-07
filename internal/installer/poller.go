@@ -124,12 +124,21 @@ func (p *PollerInstaller) Verify(ctx context.Context) error {
 
 // downloadSetup fetches the Poller setup script from GitHub.
 func (p *PollerInstaller) downloadSetup(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: wget https://raw.githubusercontent.com/SonarSoftwareInc/poller/master/setup.sh
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	return sys.RunCmd(ctx,
+		"wget -O /tmp/sonar_poller_setup.sh https://raw.githubusercontent.com/SonarSoftwareInc/poller/master/setup.sh",
+		output,
+	)
 }
 
 // runSetup executes the downloaded Poller setup script.
 func (p *PollerInstaller) runSetup(ctx context.Context, cfg *Config, output io.Writer) error {
-	// TODO: chmod +x setup.sh && sudo ./setup.sh
-	return nil
+	sys, err := SystemForTarget(cfg.Target)
+	if err != nil {
+		return fmt.Errorf("resolving target: %w", err)
+	}
+	return sys.RunCmd(ctx, "chmod +x /tmp/sonar_poller_setup.sh && /tmp/sonar_poller_setup.sh", output)
 }

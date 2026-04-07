@@ -20,8 +20,8 @@ func TestNewConfigModel(t *testing.T) {
 	if m.AppID() != installer.AppCustomerPortal {
 		t.Errorf("AppID() = %q, want %q", m.AppID(), installer.AppCustomerPortal)
 	}
-	if len(m.fields) != 5 {
-		t.Errorf("portal should have 5 fields, got %d", len(m.fields))
+	if len(m.fields) != 6 {
+		t.Errorf("portal should have 6 fields, got %d", len(m.fields))
 	}
 	if m.FocusIndex() != 0 {
 		t.Errorf("initial focus should be 0, got %d", m.FocusIndex())
@@ -31,8 +31,8 @@ func TestNewConfigModel(t *testing.T) {
 // TestNewConfigModelNetflow verifies netflow has the right number of fields.
 func TestNewConfigModelNetflow(t *testing.T) {
 	m := NewConfigModel(installer.AppNetflowOnPrem, false)
-	if len(m.fields) != 5 {
-		t.Errorf("netflow should have 5 fields, got %d", len(m.fields))
+	if len(m.fields) != 6 {
+		t.Errorf("netflow should have 6 fields, got %d", len(m.fields))
 	}
 }
 
@@ -47,8 +47,8 @@ func TestNewConfigModelPoller(t *testing.T) {
 // TestNewConfigModelFreeRADIUS verifies freeradius has the right number of fields.
 func TestNewConfigModelFreeRADIUS(t *testing.T) {
 	m := NewConfigModel(installer.AppFreeRADIUS, false)
-	if len(m.fields) != 1 {
-		t.Errorf("freeradius should have 1 field, got %d", len(m.fields))
+	if len(m.fields) != 2 {
+		t.Errorf("freeradius should have 2 fields, got %d", len(m.fields))
 	}
 }
 

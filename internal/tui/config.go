@@ -46,6 +46,7 @@ var appConfigFields = map[string][]configField{
 		{key: "api_password", label: "API Password", placeholder: "password", required: true, secret: true},
 		{key: "domain", label: "Portal Domain", placeholder: "portal.example.com", required: true},
 		{key: "email", label: "Admin Email (for TLS)", placeholder: "admin@example.com", required: true},
+		{key: "install_dir", label: "Install Directory", placeholder: "/opt", required: false},
 	},
 	installer.AppNetflowOnPrem: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
@@ -53,9 +54,11 @@ var appConfigFields = map[string][]configField{
 		{key: "netflow_name", label: "Collector Name", placeholder: "netflow-collector-1", required: false},
 		{key: "public_ip", label: "Public IP Address", placeholder: "203.0.113.1", required: true},
 		{key: "db_password", label: "Database Password", placeholder: "secure-password", required: false, secret: true},
+		{key: "install_dir", label: "Install Directory", placeholder: "/opt", required: false},
 	},
 	installer.AppFreeRADIUS: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
+		{key: "install_dir", label: "Install Directory", placeholder: "/opt", required: false},
 	},
 	installer.AppPoller: {
 		{key: "sonar_url", label: "Sonar Instance URL", placeholder: "https://myisp.sonar.software", required: true},
@@ -233,6 +236,8 @@ func (m ConfigModel) buildConfig() *installer.Config {
 			cfg.DBPassword = val
 		case "poller_api_key":
 			cfg.PollerAPIKey = val
+		case "install_dir":
+			cfg.InstallDir = val
 		}
 	}
 	return cfg
