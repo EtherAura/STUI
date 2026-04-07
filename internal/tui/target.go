@@ -39,6 +39,7 @@ var targetFields = []targetField{
 // TargetModel collects the install target before preflight starts.
 type TargetModel struct {
 	appID      string
+	mode       installer.TargetMode
 	fields     []targetField
 	inputs     []textinput.Model
 	focusIndex int
@@ -56,19 +57,18 @@ func NewTargetModel(appID string) TargetModel {
 		ti.CharLimit = 256
 		ti.Width = 32
 		switch f.key {
-		case "mode":
-			ti.SetValue(string(installer.TargetModeLocal))
 		case "port":
 			ti.SetValue("22")
 		}
 		if i == 0 {
-			ti.Focus()
+			// Focus is visual-only for the mode selector.
 		}
 		inputs[i] = ti
 	}
 
 	return TargetModel{
 		appID:  appID,
+		mode:   installer.TargetModeLocal,
 		fields: targetFields,
 		inputs: inputs,
 	}
@@ -92,9 +92,35 @@ func (m TargetModel) Update(msg tea.Msg) (TargetModel, tea.Cmd) {
 			return m.nextField()
 		case "shift+tab", "up":
 			return m.prevField()
+		case "left":
+			if m.focusIndex == 1 {
+				m.setMode(installer.TargetModeLocal)
+				return m, nil
+			}
+			if m.focusIndex == 2 {
+				m.setMode(installer.TargetModeSSH)
+				return m, nil
+			}
+		case "right":
+			if m.focusIndex == 1 {
+				m.setMode(installer.TargetModeLocal)
+				return m, nil
+			}
+			if m.focusIndex == 2 {
+				m.setMode(installer.TargetModeSSH)
+				return m, nil
+			}
+		case " ":
+			if m.isOptionRow() {
+				m.selectFocusedOption()
+				return m, nil
+			}
 		case "enter":
-			mode := strings.ToLower(strings.TrimSpace(m.inputs[0].Value()))
-			if mode == "" || mode == string(installer.TargetModeLocal) || m.focusIndex == len(m.inputs)-1 {
+			if m.isOptionRow() {
+				m.selectFocusedOption()
+				return m, nil
+			}
+			if m.isProceedRow() {
 				return m.submit()
 			}
 			return m.nextField()
@@ -105,20 +131,40 @@ func (m TargetModel) Update(msg tea.Msg) (TargetModel, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
+	if !m.isInputRow() {
+		return m, nil
+	}
+	inputIndex := m.inputIndex()
+	m.inputs[inputIndex], cmd = m.inputs[inputIndex].Update(msg)
 	return m, cmd
 }
 
 func (m TargetModel) nextField() (TargetModel, tea.Cmd) {
-	m.inputs[m.focusIndex].Blur()
-	m.focusIndex = (m.focusIndex + 1) % len(m.inputs)
-	return m, m.inputs[m.focusIndex].Focus()
+	if m.isInputRow() {
+		m.inputs[m.inputIndex()].Blur()
+	}
+	m.focusIndex++
+	if m.focusIndex >= m.rowCount() {
+		m.focusIndex = 1
+	}
+	if !m.isInputRow() {
+		return m, nil
+	}
+	return m, m.inputs[m.inputIndex()].Focus()
 }
 
 func (m TargetModel) prevField() (TargetModel, tea.Cmd) {
-	m.inputs[m.focusIndex].Blur()
-	m.focusIndex = (m.focusIndex - 1 + len(m.inputs)) % len(m.inputs)
-	return m, m.inputs[m.focusIndex].Focus()
+	if m.isInputRow() {
+		m.inputs[m.inputIndex()].Blur()
+	}
+	m.focusIndex--
+	if m.focusIndex < 1 {
+		m.focusIndex = m.rowCount() - 1
+	}
+	if !m.isInputRow() {
+		return m, nil
+	}
+	return m, m.inputs[m.inputIndex()].Focus()
 }
 
 func (m TargetModel) submit() (TargetModel, tea.Cmd) {
@@ -134,13 +180,8 @@ func (m TargetModel) submit() (TargetModel, tea.Cmd) {
 }
 
 func (m TargetModel) buildTarget() (installer.Target, error) {
-	mode := installer.TargetMode(strings.ToLower(strings.TrimSpace(m.inputs[0].Value())))
-	if mode == "" {
-		mode = installer.TargetModeLocal
-	}
-
-	target := installer.Target{Mode: mode}
-	if mode == installer.TargetModeSSH {
+	target := installer.Target{Mode: m.mode}
+	if m.mode == installer.TargetModeSSH {
 		target.User = strings.TrimSpace(m.inputs[1].Value())
 		target.Host = strings.TrimSpace(m.inputs[2].Value())
 
@@ -166,31 +207,44 @@ func (m TargetModel) View() string {
 
 	b.WriteString(TitleStyle.Render("Install Target"))
 	b.WriteString("\n")
-	b.WriteString(DimStyle.Render("Use `local` for this machine or `ssh` for a remote Ubuntu host."))
+	b.WriteString(DimStyle.Render("Choose where STUI should run preflight and installation steps."))
 	b.WriteString("\n\n")
 
-	mode := strings.ToLower(strings.TrimSpace(m.inputs[0].Value()))
-	for i, f := range m.fields {
-		if mode != string(installer.TargetModeSSH) && i > 0 {
-			continue
-		}
+	b.WriteString(BodyStyle.Render("Install Target Mode"))
+	b.WriteString("\n")
+	b.WriteString("  " + m.modeOption("Local", installer.TargetModeLocal, m.focusIndex == 1))
+	b.WriteString("\n")
+	b.WriteString("  " + m.modeOption("Remote", installer.TargetModeSSH, m.focusIndex == 2))
+	b.WriteString("\n\n")
 
-		if i == m.focusIndex {
-			b.WriteString(BannerStyle.Render(f.label))
-		} else {
-			b.WriteString(BodyStyle.Render(f.label))
+	if m.mode == installer.TargetModeSSH {
+		for i, f := range m.fields[1:] {
+			rowIndex := i + 3
+			if rowIndex == m.focusIndex {
+				b.WriteString(BannerStyle.Render(f.label))
+			} else {
+				b.WriteString(BodyStyle.Render(f.label))
+			}
+			b.WriteString("\n")
+			b.WriteString("  " + m.inputs[i+1].View())
+			b.WriteString("\n\n")
 		}
-		b.WriteString("\n")
-		b.WriteString("  " + m.inputs[i].View())
-		b.WriteString("\n\n")
 	}
+
+	proceedFocused := m.isProceedRow()
+	if proceedFocused {
+		b.WriteString(BannerStyle.Render("[ Proceed ]"))
+	} else {
+		b.WriteString(BodyStyle.Render("[ Proceed ]"))
+	}
+	b.WriteString("\n\n")
 
 	if m.err != "" {
 		b.WriteString(ErrorStyle.Render("✗ " + m.err))
 		b.WriteString("\n\n")
 	}
 
-	b.WriteString(HelpStyle.Render("Press enter to continue, tab to move, esc to go back"))
+	b.WriteString(HelpStyle.Render("Use up/down to move, enter or space to choose an option, enter on Proceed to continue, esc to go back"))
 	return AppStyle.Render(b.String())
 }
 
@@ -199,7 +253,75 @@ func (m TargetModel) AppID() string {
 	return m.appID
 }
 
-// FocusIndex returns the currently focused field index.
+// FocusIndex returns the currently focused row index.
 func (m TargetModel) FocusIndex() int {
 	return m.focusIndex
+}
+
+func (m *TargetModel) setMode(mode installer.TargetMode) {
+	m.mode = mode
+	if mode == installer.TargetModeLocal && m.focusIndex > 2 {
+		m.focusIndex = m.rowCount() - 1
+	}
+}
+
+func (m *TargetModel) selectFocusedOption() {
+	switch m.focusIndex {
+	case 1:
+		m.setMode(installer.TargetModeLocal)
+	case 2:
+		m.setMode(installer.TargetModeSSH)
+	}
+}
+
+func (m TargetModel) rowCount() int {
+	if m.mode == installer.TargetModeSSH {
+		return 7
+	}
+	return 4
+}
+
+func (m TargetModel) isOptionRow() bool {
+	return m.focusIndex == 1 || m.focusIndex == 2
+}
+
+func (m TargetModel) isInputRow() bool {
+	return m.mode == installer.TargetModeSSH && m.focusIndex >= 3 && m.focusIndex <= 5
+}
+
+func (m TargetModel) isProceedRow() bool {
+	return m.focusIndex == m.rowCount()-1
+}
+
+func (m TargetModel) inputIndex() int {
+	switch m.focusIndex {
+	case 3:
+		return 1
+	case 4:
+		return 2
+	case 5:
+		return 3
+	default:
+		return 0
+	}
+}
+
+func (m TargetModel) modeOption(label string, mode installer.TargetMode, focused bool) string {
+	text := label
+	if m.mode == mode {
+		text = "(*) " + text
+	} else {
+		text = "( ) " + text
+	}
+
+	if focused && m.mode == mode {
+		return SuccessStyle.Render(text)
+	}
+	if focused {
+		return BannerStyle.Render(text)
+	}
+	if m.mode == mode {
+		return SuccessStyle.Render(text)
+	}
+	return DimStyle.Render(text)
 }
