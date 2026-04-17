@@ -92,11 +92,22 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context, target Target)
 	}
 
 	// Local installs may relaunch STUI with local privilege escalation.
-	// Remote targets should not trigger a local sudo/doas restart.
+	// Remote targets should not trigger a local sudo/doas restart, but they
+	// still need a usable remote privilege escalation path.
 	if target.Mode == TargetModeLocal && !system.IsRoot() {
 		result.NeedsRoot = true
 		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
+	} else if target.Mode == TargetModeSSH && !system.IsRoot() {
+		result.Escalation = system.DetectEscalation()
+		if result.Escalation == nil {
+			result.Passed = false
+			result.Errors = append(result.Errors,
+				"remote target is not root and no sudo/doas command is available; connect as root or install sudo/doas")
+		} else {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("remote target is not root; privileged commands will use %s and require non-interactive access", result.Escalation.Name))
+		}
 	}
 
 	return result, nil
@@ -173,5 +184,5 @@ func (f *FreeRADIUSInstaller) runGenie(ctx context.Context, cfg *Config, output 
 		return fmt.Errorf("resolving target: %w", err)
 	}
 	dir := repoDir(cfg, "freeradius_genie-v3")
-	return sys.RunCmd(ctx, fmt.Sprintf("cd %s && chmod +x genie && ./genie", shellQuote(dir)), output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, fmt.Sprintf("cd %s && chmod +x genie && ./genie", shellQuote(dir)), output)
 }

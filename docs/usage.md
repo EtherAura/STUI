@@ -44,6 +44,7 @@ STUI launches a full-screen terminal interface. No flags or arguments are needed
 
 - **OS:** Ubuntu 24.04 LTS (primary target). May work on other Debian-based distributions.
 - **Privileges:** Root/sudo is required for installing Sonar applications. STUI will prompt for elevation when needed.
+- **Remote installs:** For SSH targets, connect as `root` or use a remote account with non-interactive `sudo`/`doas` access.
 - **Terminal:** Any terminal emulator that supports 256 colors. True color is supported when available.
 
 ## Navigation

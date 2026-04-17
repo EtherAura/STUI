@@ -100,11 +100,22 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*P
 	}
 
 	// Local installs may relaunch STUI with local privilege escalation.
-	// Remote targets should not trigger a local sudo/doas restart.
+	// Remote targets should not trigger a local sudo/doas restart, but they
+	// still need a usable remote privilege escalation path.
 	if target.Mode == TargetModeLocal && !system.IsRoot() {
 		result.NeedsRoot = true
 		result.Escalation = system.DetectEscalation()
 		result.Warnings = append(result.Warnings, "not running as root; elevated privileges are required")
+	} else if target.Mode == TargetModeSSH && !system.IsRoot() {
+		result.Escalation = system.DetectEscalation()
+		if result.Escalation == nil {
+			result.Passed = false
+			result.Errors = append(result.Errors,
+				"remote target is not root and no sudo/doas command is available; connect as root or install sudo/doas")
+		} else {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("remote target is not root; privileged commands will use %s and require non-interactive access", result.Escalation.Name))
+		}
 	}
 
 	return result, nil
@@ -151,7 +162,7 @@ func (p *PortalInstaller) installPrereqs(ctx context.Context, cfg *Config, outpu
 	if err != nil {
 		return fmt.Errorf("resolving target: %w", err)
 	}
-	return sys.RunCmd(ctx, "apt-get update -y && apt-get install -y git unzip", output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, "apt-get update -y && apt-get install -y git unzip", output)
 }
 
 // cloneRepo clones the customer_portal repository from GitHub.
@@ -197,5 +208,5 @@ func (p *PortalInstaller) runInstall(ctx context.Context, cfg *Config, output io
 		return fmt.Errorf("resolving target: %w", err)
 	}
 	dir := repoDir(cfg, "customer_portal")
-	return sys.RunCmd(ctx, fmt.Sprintf("cd %s && chmod +x install.sh && ./install.sh", shellQuote(dir)), output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, fmt.Sprintf("cd %s && chmod +x install.sh && ./install.sh", shellQuote(dir)), output)
 }
