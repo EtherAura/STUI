@@ -47,7 +47,8 @@ func (p *PollerInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets Poller requirements:
 // Ubuntu OS and root access.
-func (p *PollerInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
+func (p *PollerInstaller) PreflightCheck(ctx context.Context, cfg *Config) (*PreflightResult, error) {
+	target := cfg.Target
 	target.Normalize()
 	result := &PreflightResult{Passed: true}
 	system, err := SystemForTarget(target)
@@ -95,8 +96,11 @@ func (p *PollerInstaller) PreflightCheck(ctx context.Context, target Target) (*P
 			result.Errors = append(result.Errors,
 				"remote target is not root and no sudo/doas command is available; connect as root or install sudo/doas")
 		} else {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("remote target is not root; privileged commands will use %s and require non-interactive access", result.Escalation.Name))
+			msg := fmt.Sprintf("remote target is not root; privileged commands will use %s", result.Escalation.Name)
+			if result.Escalation.Name == "sudo" && target.SudoPassword == "" {
+				msg += " and may require a sudo password"
+			}
+			result.Warnings = append(result.Warnings, msg)
 		}
 	}
 

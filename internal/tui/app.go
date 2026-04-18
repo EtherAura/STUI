@@ -94,18 +94,16 @@ func NewAppModel() AppModel {
 }
 
 // NewAppModelWithResume creates a root model that immediately
-// navigates to the preflight screen for the given app ID.
+// navigates to the config screen for the given app ID.
 // Used after a privilege-escalated relaunch so the user is returned
 // to the installer they were viewing.
 func NewAppModelWithResume(appID string) AppModel {
 	reg := installer.NewRegistry()
-	ctx, cancel := context.WithCancel(context.Background())
 	return AppModel{
 		registry:    reg,
-		screen:      ScreenPreflight,
+		screen:      ScreenConfig,
 		menu:        NewMenuModel(),
-		preflight:   NewPreflightModel(ctx, reg, appID, installer.Target{}),
-		cancel:      cancel,
+		config:      NewConfigModel(appID, false),
 		resumeAppID: appID,
 	}
 }
@@ -115,7 +113,7 @@ func NewAppModelWithResume(appID string) AppModel {
 // is started immediately instead of the menu.
 func (m AppModel) Init() tea.Cmd {
 	if m.resumeAppID != "" {
-		return m.preflight.Init()
+		return m.config.Init()
 	}
 	return m.menu.Init()
 }
@@ -171,22 +169,22 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.target = NewTargetModel(msg.AppID)
 		m.screen = ScreenTarget
 		return m, m.target.Init()
-	case StartPreflightMsg:
-		// Cancel any prior operation and create a new context.
-		m.cancelRunning()
-		ctx, cancel := context.WithCancel(context.Background())
-		m.cancel = cancel
-		m.preflight = NewPreflightModel(ctx, m.registry, msg.AppID, msg.Target)
-		m.screen = ScreenPreflight
-		return m, m.preflight.Init()
 	case StartConfigMsg:
-		// Cancel the preflight context (check is done).
+		// Transition from target to config wizard.
 		m.cancelRunning()
 		m.config = NewConfigModelWithTarget(msg.AppID, msg.Target, m.settings.ShowPasswords())
 		m.screen = ScreenConfig
 		return m, m.config.Init()
 	case ConfigDoneMsg:
-		// Create a new context for the installation.
+		// Config is done; run preflight checks with the collected config.
+		m.cancelRunning()
+		ctx, cancel := context.WithCancel(context.Background())
+		m.cancel = cancel
+		m.preflight = NewPreflightModel(ctx, m.registry, msg.AppID, msg.Config)
+		m.screen = ScreenPreflight
+		return m, m.preflight.Init()
+	case StartInstallMsg:
+		// Preflight passed; start the installation.
 		m.cancelRunning()
 		ctx, cancel := context.WithCancel(context.Background())
 		m.cancel = cancel

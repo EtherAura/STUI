@@ -14,15 +14,6 @@ import (
 	"github.com/EtherAura/stui/internal/installer"
 )
 
-// StartPreflightMsg signals the app to transition from the target
-// screen to the preflight check screen.
-type StartPreflightMsg struct {
-	// AppID is the registry key of the selected application.
-	AppID string
-	// Target is the chosen install target.
-	Target installer.Target
-}
-
 type targetField struct {
 	key         string
 	label       string
@@ -182,7 +173,7 @@ func (m TargetModel) submit() (TargetModel, tea.Cmd) {
 	}
 
 	return m, func() tea.Msg {
-		return StartPreflightMsg{AppID: m.appID, Target: target}
+		return StartConfigMsg{AppID: m.appID, Target: target}
 	}
 }
 

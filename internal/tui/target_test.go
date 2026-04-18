@@ -33,12 +33,12 @@ func TestTargetModelSubmitLocal(t *testing.T) {
 	}
 
 	msg := cmd()
-	preflight, ok := msg.(StartPreflightMsg)
+	cfgMsg, ok := msg.(StartConfigMsg)
 	if !ok {
-		t.Fatalf("expected StartPreflightMsg, got %T", msg)
+		t.Fatalf("expected StartConfigMsg, got %T", msg)
 	}
-	if preflight.Target.Mode != installer.TargetModeLocal {
-		t.Fatalf("target mode = %q, want %q", preflight.Target.Mode, installer.TargetModeLocal)
+	if cfgMsg.Target.Mode != installer.TargetModeLocal {
+		t.Fatalf("target mode = %q, want %q", cfgMsg.Target.Mode, installer.TargetModeLocal)
 	}
 }
 

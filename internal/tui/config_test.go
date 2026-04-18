@@ -226,7 +226,7 @@ func TestConfigModelAllApps(t *testing.T) {
 }
 
 // TestAppModelTransitionToConfig verifies StartConfigMsg transitions
-// from preflight to config screen.
+// from target to config screen.
 func TestAppModelTransitionToConfig(t *testing.T) {
 	m := NewAppModel()
 

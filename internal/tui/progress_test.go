@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -98,6 +99,22 @@ func TestProgressModelStepMsg(t *testing.T) {
 	if m.currentStep != "Clone repo" {
 		t.Errorf("currentStep = %q, want %q", m.currentStep, "Clone repo")
 	}
+	if m.completedSteps != 1 {
+		t.Errorf("completedSteps = %d, want 1", m.completedSteps)
+	}
+}
+
+func TestProgressModelProgressUsesCompletedSteps(t *testing.T) {
+	reg := installer.NewRegistry()
+	cfg := newTestConfig()
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
+
+	m, _ = m.Update(InstallStepMsg{StepIndex: 3, StepName: "Run install script", TotalSteps: 4})
+	view := m.View()
+
+	if strings.Contains(view, "100%") {
+		t.Error("view should not show 100% while the last step is still running")
+	}
 }
 
 // TestProgressModelDoneSuccess verifies successful completion.
@@ -138,6 +155,73 @@ func TestProgressModelDoneError(t *testing.T) {
 	}
 	if !strings.Contains(m.output.String(), "failed") {
 		t.Error("output should contain failure message")
+	}
+}
+
+func TestProgressModelSudoPrompt(t *testing.T) {
+	reg := installer.NewRegistry()
+	cfg := newTestConfig()
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
+
+	m, _ = m.Update(InstallSudoPromptMsg{StepName: "Install prerequisites"})
+	view := m.View()
+
+	if !strings.Contains(view, "Remote sudo password required") {
+		t.Error("view should contain sudo prompt heading")
+	}
+	if !strings.Contains(view, "Install prerequisites") {
+		t.Error("view should mention the waiting step")
+	}
+}
+
+func TestProgressModelSudoPromptSubmit(t *testing.T) {
+	reg := installer.NewRegistry()
+	cfg := newTestConfig()
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
+
+	m, _ = m.Update(InstallSudoPromptMsg{StepName: "Install prerequisites"})
+	m.sudoInput.SetValue("secret")
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated
+
+	if m.awaitingSudo {
+		t.Error("awaitingSudo should be false after submitting")
+	}
+	if cmd == nil {
+		t.Fatal("enter should continue waiting for install output")
+	}
+	select {
+	case got := <-m.sudoResp:
+		if got != "secret" {
+			t.Fatalf("sudoResp = %q, want %q", got, "secret")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected sudo password to be sent to install goroutine")
+	}
+}
+
+func TestProgressModelSudoPromptEscCancels(t *testing.T) {
+	reg := installer.NewRegistry()
+	cfg := newTestConfig()
+	m := NewProgressModel(context.Background(), reg, installer.AppCustomerPortal, cfg)
+
+	m, _ = m.Update(InstallSudoPromptMsg{StepName: "Install prerequisites"})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m = updated
+
+	if m.awaitingSudo {
+		t.Error("awaitingSudo should be false after escape")
+	}
+	if cmd == nil {
+		t.Fatal("esc should wait for cancellation completion")
+	}
+	select {
+	case got := <-m.sudoResp:
+		if got != "" {
+			t.Fatalf("sudoResp = %q, want empty cancellation sentinel", got)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected cancellation sentinel to be sent")
 	}
 }
 
@@ -234,13 +318,13 @@ func TestProgressModelViewDone(t *testing.T) {
 	}
 }
 
-// TestAppModelTransitionToInstall verifies ConfigDoneMsg transitions
+// TestAppModelTransitionToInstall verifies StartInstallMsg transitions
 // to the install screen.
 func TestAppModelTransitionToInstall(t *testing.T) {
 	m := NewAppModel()
 	cfg := newTestConfig()
 
-	updated, _ := m.Update(ConfigDoneMsg{
+	updated, _ := m.Update(StartInstallMsg{
 		AppID:  installer.AppCustomerPortal,
 		Config: cfg,
 	})

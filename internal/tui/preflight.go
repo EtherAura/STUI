@@ -33,6 +33,15 @@ type StartConfigMsg struct {
 	Target installer.Target
 }
 
+// StartInstallMsg signals transition from preflight to the install
+// progress screen after all checks have passed.
+type StartInstallMsg struct {
+	// AppID is the registry key of the selected application.
+	AppID string
+	// Config holds the user-provided configuration values.
+	Config *installer.Config
+}
+
 // ElevateMsg signals that the application should quit and
 // relaunch itself with the detected escalation command (sudo/doas).
 type ElevateMsg struct {
@@ -52,8 +61,8 @@ type PreflightModel struct {
 	inst installer.Installer
 	// ctx is the cancellable context for the preflight check.
 	ctx context.Context
-	// target is the selected install target.
-	target installer.Target
+	// cfg holds the user-provided configuration including target.
+	cfg *installer.Config
 	// spinner provides visual feedback while the check is running.
 	spinner spinner.Model
 	// running is true while the preflight check is in progress.
@@ -70,8 +79,10 @@ type PreflightModel struct {
 // NewPreflightModel creates a preflight screen for the given app,
 // instantiating the installer from the registry. The provided context
 // allows the caller to cancel the preflight check on navigation.
-func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string, target installer.Target) PreflightModel {
-	target.Normalize()
+// The Config carries the install target and any app-specific values
+// (e.g., domain) needed for checks like DNS resolution.
+func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string, cfg *installer.Config) PreflightModel {
+	cfg.Target.Normalize()
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = BannerStyle
@@ -85,7 +96,7 @@ func NewPreflightModel(ctx context.Context, reg installer.Registry, appID string
 		appID:   appID,
 		inst:    inst,
 		ctx:     ctx,
-		target:  target,
+		cfg:     cfg,
 		spinner: s,
 		running: true,
 	}
@@ -105,14 +116,14 @@ func (m PreflightModel) Init() tea.Cmd {
 func (m PreflightModel) runPreflight() tea.Cmd {
 	inst := m.inst
 	ctx := m.ctx
-	target := m.target
+	cfg := m.cfg
 	return func() tea.Msg {
 		if inst == nil {
 			return PreflightDoneMsg{
 				Err: fmt.Errorf("no installer for app %q", m.appID),
 			}
 		}
-		result, err := inst.PreflightCheck(ctx, target)
+		result, err := inst.PreflightCheck(ctx, cfg)
 		return PreflightDoneMsg{Result: result, Err: err}
 	}
 }
@@ -133,12 +144,12 @@ func (m PreflightModel) Update(msg tea.Msg) (PreflightModel, tea.Cmd) {
 				// Only proceed if checks passed.
 				if m.result != nil && m.result.Passed {
 					return m, func() tea.Msg {
-						return StartConfigMsg{AppID: m.appID, Target: m.target}
+						return StartInstallMsg{AppID: m.appID, Config: m.cfg}
 					}
 				}
 			case "s":
 				// Offer escalation relaunch when not running as root.
-				if m.target.Mode == installer.TargetModeLocal &&
+				if m.cfg.Target.Mode == installer.TargetModeLocal &&
 					m.result != nil && m.result.NeedsRoot && m.result.Escalation != nil {
 					esc := m.result.Escalation
 					appID := m.appID
@@ -175,7 +186,7 @@ func (m PreflightModel) View() string {
 
 	if m.running {
 		b.WriteString(m.spinner.View())
-		b.WriteString(" Running preflight checks on " + m.target.Display() + "...")
+		b.WriteString(" Running preflight checks on " + m.cfg.Target.Display() + "...")
 		return AppStyle.Render(b.String())
 	}
 
@@ -189,7 +200,7 @@ func (m PreflightModel) View() string {
 
 	// Display results.
 	if m.result != nil {
-		b.WriteString(BodyStyle.Render("Target: " + m.target.Display()))
+		b.WriteString(BodyStyle.Render("Target: " + m.cfg.Target.Display()))
 		b.WriteString("\n\n")
 
 		// OS info.
@@ -235,6 +246,34 @@ func (m PreflightModel) View() string {
 			b.WriteString("\n\n")
 		}
 
+		// DNS resolution section.
+		if m.result.DNS != nil {
+			b.WriteString(BannerStyle.Render("DNS Check"))
+			b.WriteString("\n")
+			if m.result.DNS.OK() {
+				b.WriteString(SuccessStyle.Render(fmt.Sprintf(
+					"  ✓  %s → %s", m.result.DNS.Domain, installer.FormatIPs(m.result.DNS.IPs))))
+			} else {
+				b.WriteString(ErrorStyle.Render(fmt.Sprintf(
+					"  ✗  %s failed to resolve", m.result.DNS.Domain)))
+			}
+			b.WriteString("\n")
+
+			// Port reachability results.
+			for _, pr := range m.result.DNS.Ports {
+				if pr.Open {
+					b.WriteString(SuccessStyle.Render(fmt.Sprintf(
+						"  ✓  Port %d reachable", pr.Port)))
+				} else {
+					b.WriteString(WarningStyle.Render(fmt.Sprintf(
+						"  ⚠  Port %d not reachable", pr.Port)))
+				}
+				b.WriteString("\n")
+			}
+
+			b.WriteString("\n")
+		}
+
 		// Errors (blocking).
 		if len(m.result.Errors) > 0 {
 			b.WriteString(ErrorStyle.Render("Blocking Issues:"))
@@ -273,7 +312,7 @@ func (m PreflightModel) View() string {
 		}
 
 		// Escalation relaunch option when not running as root.
-		if m.target.Mode == installer.TargetModeLocal && m.result.NeedsRoot {
+		if m.cfg.Target.Mode == installer.TargetModeLocal && m.result.NeedsRoot {
 			if m.result.Escalation != nil {
 				b.WriteString(WarningStyle.Render(
 					fmt.Sprintf("Press s to restart with %s", m.result.Escalation.Name)))

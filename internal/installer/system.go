@@ -33,6 +33,9 @@ type System interface {
 	// to output. The command is passed to sh -c for local targets or
 	// sh -lc for SSH targets. Context cancellation terminates the command.
 	RunCmd(ctx context.Context, command string, output io.Writer) error
+	// RunCmdInput executes a shell command and writes the supplied input
+	// to stdin before waiting for completion.
+	RunCmdInput(ctx context.Context, command string, input string, output io.Writer) error
 }
 
 type localSystem struct{}
@@ -69,9 +72,16 @@ func (localSystem) Statfs(path string, buf *unix.Statfs_t) error {
 // RunCmd executes a shell command locally via sh -c, streaming
 // combined stdout and stderr to the provided writer.
 func (localSystem) RunCmd(ctx context.Context, command string, output io.Writer) error {
+	return localSystem{}.RunCmdInput(ctx, command, "", output)
+}
+
+func (localSystem) RunCmdInput(ctx context.Context, command string, input string, output io.Writer) error {
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Stdout = output
 	cmd.Stderr = output
+	if input != "" {
+		cmd.Stdin = strings.NewReader(input)
+	}
 	return cmd.Run()
 }
 
@@ -133,6 +143,13 @@ func (s sshSystem) NumCPU() int {
 // RunCmd executes a shell command on the remote host over SSH,
 // streaming combined stdout and stderr to the provided writer.
 func (s sshSystem) RunCmd(ctx context.Context, command string, output io.Writer) error {
+	return s.RunCmdInput(ctx, command, "", output)
+}
+
+// RunCmdInput executes a shell command on the remote host over SSH,
+// streaming combined stdout and stderr to the provided writer while
+// optionally sending input to stdin.
+func (s sshSystem) RunCmdInput(ctx context.Context, command string, input string, output io.Writer) error {
 	client, err := s.client()
 	if err != nil {
 		return err
@@ -147,6 +164,16 @@ func (s sshSystem) RunCmd(ctx context.Context, command string, output io.Writer)
 
 	session.Stdout = output
 	session.Stderr = output
+	if input != "" {
+		stdin, err := session.StdinPipe()
+		if err != nil {
+			return fmt.Errorf("opening ssh stdin: %w", err)
+		}
+		go func() {
+			_, _ = io.WriteString(stdin, input)
+			_ = stdin.Close()
+		}()
+	}
 
 	done := make(chan error, 1)
 	go func() {

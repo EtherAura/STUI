@@ -99,6 +99,7 @@ func TestPrivilegedCommand(t *testing.T) {
 		esc     *EscalationMethod
 		command string
 		want    string
+		wantIn  string
 		wantErr string
 	}{
 		{
@@ -113,7 +114,15 @@ func TestPrivilegedCommand(t *testing.T) {
 			target:  Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu"},
 			esc:     &EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"},
 			command: "apt-get update -y",
-			want:    "sudo -n sh -lc 'apt-get update -y'",
+			wantErr: "remote sudo password is required",
+		},
+		{
+			name:    "remote sudo password uses stdin",
+			target:  Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu", SudoPassword: "sudopass"},
+			esc:     &EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"},
+			command: "apt-get update -y",
+			want:    "sudo -S -p '' sh -lc 'apt-get update -y'",
+			wantIn:  "sudopass\n",
 		},
 		{
 			name:    "remote doas wraps command",
@@ -138,7 +147,7 @@ func TestPrivilegedCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := privilegedCommand(tt.target, tt.isRoot, tt.esc, tt.command)
+			got, gotInput, err := privilegedCommand(tt.target, tt.isRoot, tt.esc, tt.command)
 			if tt.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
@@ -155,6 +164,9 @@ func TestPrivilegedCommand(t *testing.T) {
 			if got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
+			if gotInput != tt.wantIn {
+				t.Fatalf("input = %q, want %q", gotInput, tt.wantIn)
+			}
 		})
 	}
 }
@@ -164,6 +176,7 @@ type stubSystem struct {
 	esc     *EscalationMethod
 	runErr  error
 	lastCmd string
+	lastIn  string
 }
 
 func (s *stubSystem) ReadFile(path string) ([]byte, error) { return nil, errors.New("unused") }
@@ -175,7 +188,11 @@ func (s *stubSystem) Statfs(path string, buf *unix.Statfs_t) error {
 	return errors.New("unused")
 }
 func (s *stubSystem) RunCmd(ctx context.Context, command string, output io.Writer) error {
+	return s.RunCmdInput(ctx, command, "", output)
+}
+func (s *stubSystem) RunCmdInput(ctx context.Context, command string, input string, output io.Writer) error {
 	s.lastCmd = command
+	s.lastIn = input
 	return s.runErr
 }
 
@@ -195,11 +212,55 @@ func TestRunPrivilegedCmdRemoteErrorMessage(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !contains(err.Error(), "connect as root or configure passwordless sudo") {
-		t.Fatalf("error = %q, want remote guidance", err.Error())
+	if !contains(err.Error(), "remote sudo password is required") {
+		t.Fatalf("error = %q, want sudo prompt request", err.Error())
 	}
-	if sys.lastCmd != "sudo -n sh -lc 'apt-get update -y'" {
+	if sys.lastCmd != "" {
+		t.Fatalf("RunCmd command = %q, want command not to run yet", sys.lastCmd)
+	}
+}
+
+func TestRunPrivilegedCmdRemoteSudoPassword(t *testing.T) {
+	sys := &stubSystem{
+		esc: &EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"},
+	}
+
+	err := RunPrivilegedCmd(
+		context.Background(),
+		Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu", SudoPassword: "sudopass"},
+		sys,
+		"apt-get update -y",
+		io.Discard,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sys.lastCmd != "sudo -S -p '' sh -lc 'apt-get update -y'" {
 		t.Fatalf("RunCmd command = %q", sys.lastCmd)
+	}
+	if sys.lastIn != "sudopass\n" {
+		t.Fatalf("RunCmd input = %q", sys.lastIn)
+	}
+}
+
+func TestRunPrivilegedCmdInputAppendsCommandInput(t *testing.T) {
+	sys := &stubSystem{
+		esc: &EscalationMethod{Name: "sudo", Path: "/usr/bin/sudo"},
+	}
+
+	err := RunPrivilegedCmdInput(
+		context.Background(),
+		Target{Mode: TargetModeSSH, Host: "192.0.2.10", User: "ubuntu", SudoPassword: "sudopass"},
+		sys,
+		"./install.sh",
+		"answer1\nanswer2\n",
+		io.Discard,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sys.lastIn != "sudopass\nanswer1\nanswer2\n" {
+		t.Fatalf("RunCmd input = %q", sys.lastIn)
 	}
 }
 

@@ -6,12 +6,14 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -39,6 +41,14 @@ type InstallDoneMsg struct {
 	// Err is non-nil if installation failed.
 	Err error
 }
+
+// InstallSudoPromptMsg requests an interactive sudo password so the current
+// remote installation step can be retried.
+type InstallSudoPromptMsg struct {
+	StepName string
+}
+
+const installCanceledWhileWaitingForSudo = "installation cancelled while waiting for remote sudo password"
 
 // StartVerifyMsg signals transition from progress to verification.
 type StartVerifyMsg struct {
@@ -72,6 +82,8 @@ type ProgressModel struct {
 	currentStep string
 	// stepIndex is the zero-based index of the current step.
 	stepIndex int
+	// completedSteps is the number of steps that have finished successfully.
+	completedSteps int
 	// totalSteps is the total number of installation steps.
 	totalSteps int
 	// running is true while installation is in progress.
@@ -80,6 +92,14 @@ type ProgressModel struct {
 	done bool
 	// err holds any installation error.
 	err error
+	// awaitingSudo indicates install progress is paused for a remote sudo password.
+	awaitingSudo bool
+	// sudoPrompt tracks which step is waiting on a password prompt.
+	sudoPrompt string
+	// sudoInput holds the masked password entry field.
+	sudoInput textinput.Model
+	// sudoResp carries entered passwords back to the install goroutine.
+	sudoResp chan string
 	// width and height track the terminal dimensions.
 	width  int
 	height int
@@ -97,6 +117,12 @@ func NewProgressModel(ctx context.Context, reg installer.Registry, appID string,
 
 	vp := viewport.New(defaultMenuWidth, 12)
 	vp.SetContent("")
+	sudoInput := textinput.New()
+	sudoInput.Placeholder = "sudo password"
+	sudoInput.CharLimit = 256
+	sudoInput.Width = 32
+	sudoInput.EchoMode = textinput.EchoPassword
+	sudoInput.EchoCharacter = '•'
 
 	var inst installer.Installer
 	var totalSteps int
@@ -115,8 +141,10 @@ func NewProgressModel(ctx context.Context, reg installer.Registry, appID string,
 		viewport:   vp,
 		output:     &strings.Builder{},
 		msgCh:      make(chan tea.Msg, 256),
+		sudoResp:   make(chan string),
 		totalSteps: totalSteps,
 		running:    true,
+		sudoInput:  sudoInput,
 	}
 }
 
@@ -141,15 +169,15 @@ func (m ProgressModel) runInstall() tea.Cmd {
 	ctx := m.ctx
 	return func() tea.Msg {
 		go func() {
-			defer close(ch)
-
 			if inst == nil {
 				ch <- InstallDoneMsg{Err: fmt.Errorf("no installer for app %q", appID)}
+				close(ch)
 				return
 			}
 
 			if err := cfg.Validate(); err != nil {
 				ch <- InstallDoneMsg{Err: fmt.Errorf("invalid config: %w", err)}
+				close(ch)
 				return
 			}
 
@@ -160,17 +188,45 @@ func (m ProgressModel) runInstall() tea.Cmd {
 				select {
 				case <-ctx.Done():
 					ch <- InstallDoneMsg{Err: ctx.Err()}
+					close(ch)
 					return
 				case ch <- InstallStepMsg{StepIndex: i, StepName: step.Name, TotalSteps: len(steps)}:
 				}
 
-				if err := step.Action(ctx, cfg, writer); err != nil {
+				for {
+					err := step.Action(ctx, cfg, writer)
+					if err == nil {
+						break
+					}
+
+					var sudoErr *installer.SudoPasswordRequiredError
+					if errors.As(err, &sudoErr) {
+						ch <- InstallSudoPromptMsg{StepName: step.Name}
+						select {
+						case <-ctx.Done():
+							ch <- InstallDoneMsg{Err: ctx.Err()}
+							close(ch)
+							return
+						case password := <-m.sudoResp:
+							if password == "" {
+								ch <- InstallDoneMsg{Err: fmt.Errorf(installCanceledWhileWaitingForSudo)}
+								close(ch)
+								return
+							}
+							cfg.Target.SudoPassword = password
+							ch <- InstallOutputMsg{Output: "  Retrying with provided sudo password...\n"}
+							continue
+						}
+					}
+
 					ch <- InstallDoneMsg{Err: fmt.Errorf("step %q: %w", step.Name, err)}
+					close(ch)
 					return
 				}
 			}
 
 			ch <- InstallDoneMsg{Err: nil}
+			close(ch)
 		}()
 
 		// Block until the first message arrives.
@@ -232,6 +288,9 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		m.viewport.GotoBottom()
 		return m, waitForInstallMsg(m.msgCh)
 	case InstallStepMsg:
+		if msg.StepIndex > 0 {
+			m.completedSteps = msg.StepIndex
+		}
 		m.stepIndex = msg.StepIndex
 		m.currentStep = msg.StepName
 		m.totalSteps = msg.TotalSteps
@@ -242,8 +301,12 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		return m, waitForInstallMsg(m.msgCh)
 	case InstallDoneMsg:
 		m.running = false
+		m.awaitingSudo = false
 		m.done = true
 		m.err = msg.Err
+		if msg.Err == nil {
+			m.completedSteps = m.totalSteps
+		}
 		if msg.Err != nil {
 			fmt.Fprintf(m.output, "\n✗ Installation failed: %s\n", msg.Err)
 		} else {
@@ -252,7 +315,44 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		m.viewport.SetContent(m.output.String())
 		m.viewport.GotoBottom()
 		return m, nil
+	case InstallSudoPromptMsg:
+		m.awaitingSudo = true
+		m.sudoPrompt = msg.StepName
+		m.sudoInput.SetValue("")
+		m.sudoInput.Focus()
+		return m, nil
 	case tea.KeyMsg:
+		if m.awaitingSudo {
+			switch msg.String() {
+			case "enter":
+				password := m.sudoInput.Value()
+				if strings.TrimSpace(password) == "" {
+					return m, nil
+				}
+				m.awaitingSudo = false
+				m.sudoPrompt = ""
+				m.sudoInput.Blur()
+				m.output.WriteString("  Remote sudo password captured. Retrying step...\n")
+				m.viewport.SetContent(m.output.String())
+				m.viewport.GotoBottom()
+				go func() {
+					m.sudoResp <- password
+				}()
+				return m, waitForInstallMsg(m.msgCh)
+			case "esc":
+				m.awaitingSudo = false
+				m.sudoPrompt = ""
+				m.sudoInput.Blur()
+				go func() {
+					m.sudoResp <- ""
+				}()
+				return m, waitForInstallMsg(m.msgCh)
+			}
+
+			var cmd tea.Cmd
+			m.sudoInput, cmd = m.sudoInput.Update(msg)
+			return m, cmd
+		}
 		if m.done {
 			switch msg.String() {
 			case "enter":
@@ -282,7 +382,7 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		m.viewport.Width = msg.Width - 4
 		m.viewport.Height = vpHeight
 	case spinner.TickMsg:
-		if m.running {
+		if m.running && !m.awaitingSudo {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
@@ -306,7 +406,7 @@ func (m ProgressModel) View() string {
 	// Progress bar.
 	var pct float64
 	if m.totalSteps > 0 {
-		pct = float64(m.stepIndex+1) / float64(m.totalSteps)
+		pct = float64(m.completedSteps) / float64(m.totalSteps)
 	}
 	if m.done && m.err == nil {
 		pct = 1.0
@@ -316,6 +416,8 @@ func (m ProgressModel) View() string {
 
 	// Current step or status.
 	switch {
+	case m.awaitingSudo:
+		b.WriteString(WarningStyle.Render("Remote sudo password required"))
 	case m.running:
 		step := m.currentStep
 		if step == "" {
@@ -335,6 +437,16 @@ func (m ProgressModel) View() string {
 	b.WriteString(m.viewport.View())
 	b.WriteString("\n\n")
 
+	if m.awaitingSudo {
+		b.WriteString(BodyStyle.Render("Enter the remote sudo password to continue"))
+		if m.sudoPrompt != "" {
+			b.WriteString(DimStyle.Render(" (" + m.sudoPrompt + ")"))
+		}
+		b.WriteString("\n")
+		b.WriteString("  " + m.sudoInput.View())
+		b.WriteString("\n\n")
+	}
+
 	// Help text.
 	if m.done {
 		if m.err == nil {
@@ -343,7 +455,11 @@ func (m ProgressModel) View() string {
 		}
 		b.WriteString(HelpStyle.Render("Press esc to return to menu"))
 	} else {
-		b.WriteString(HelpStyle.Render("↑/↓: scroll output"))
+		if m.awaitingSudo {
+			b.WriteString(HelpStyle.Render("Enter: submit password, esc: cancel install"))
+		} else {
+			b.WriteString(HelpStyle.Render("↑/↓: scroll output"))
+		}
 	}
 
 	return AppStyle.Render(b.String())

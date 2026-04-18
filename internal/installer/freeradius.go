@@ -51,7 +51,8 @@ func (f *FreeRADIUSInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets FreeRADIUS requirements:
 // Ubuntu OS, git available, and root access.
-func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
+func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context, cfg *Config) (*PreflightResult, error) {
+	target := cfg.Target
 	target.Normalize()
 	result := &PreflightResult{Passed: true}
 	system, err := SystemForTarget(target)
@@ -105,8 +106,11 @@ func (f *FreeRADIUSInstaller) PreflightCheck(ctx context.Context, target Target)
 			result.Errors = append(result.Errors,
 				"remote target is not root and no sudo/doas command is available; connect as root or install sudo/doas")
 		} else {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("remote target is not root; privileged commands will use %s and require non-interactive access", result.Escalation.Name))
+			msg := fmt.Sprintf("remote target is not root; privileged commands will use %s", result.Escalation.Name)
+			if result.Escalation.Name == "sudo" && target.SudoPassword == "" {
+				msg += " and may require a sudo password"
+			}
+			result.Warnings = append(result.Warnings, msg)
 		}
 	}
 
@@ -156,7 +160,7 @@ func (f *FreeRADIUSInstaller) cloneRepo(ctx context.Context, cfg *Config, output
 		`if [ -d %[1]s/.git ]; then echo "Repository exists, pulling latest..." && cd %[1]s && git pull; else git clone https://github.com/SonarSoftwareInc/freeradius_genie-v3.git %[1]s; fi`,
 		shellQuote(dir),
 	)
-	return sys.RunCmd(ctx, cmd, output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, cmd, output)
 }
 
 // configureEnv creates the .env file from .env.example and populates
@@ -174,7 +178,7 @@ func (f *FreeRADIUSInstaller) configureEnv(ctx context.Context, cfg *Config, out
 	envPath := dir + "/.env"
 	cmd := fmt.Sprintf("printf '%%s' %s > %s", shellQuote(env.String()), shellQuote(envPath))
 	_, _ = fmt.Fprintf(output, "  Writing %s\n", envPath)
-	return sys.RunCmd(ctx, cmd, output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, cmd, output)
 }
 
 // runGenie executes the genie CLI to complete FreeRADIUS setup.

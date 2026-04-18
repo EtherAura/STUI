@@ -49,7 +49,8 @@ func (n *NetflowInstaller) HardwareRequirements() HardwareReqs {
 
 // PreflightCheck verifies the host meets Netflow requirements:
 // Ubuntu or Debian OS, git/make/unzip available, and root access.
-func (n *NetflowInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
+func (n *NetflowInstaller) PreflightCheck(ctx context.Context, cfg *Config) (*PreflightResult, error) {
+	target := cfg.Target
 	target.Normalize()
 	result := &PreflightResult{Passed: true}
 	system, err := SystemForTarget(target)
@@ -111,8 +112,11 @@ func (n *NetflowInstaller) PreflightCheck(ctx context.Context, target Target) (*
 			result.Errors = append(result.Errors,
 				"remote target is not root and no sudo/doas command is available; connect as root or install sudo/doas")
 		} else {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("remote target is not root; privileged commands will use %s and require non-interactive access", result.Escalation.Name))
+			msg := fmt.Sprintf("remote target is not root; privileged commands will use %s", result.Escalation.Name)
+			if result.Escalation.Name == "sudo" && target.SudoPassword == "" {
+				msg += " and may require a sudo password"
+			}
+			result.Warnings = append(result.Warnings, msg)
 		}
 	}
 
@@ -178,7 +182,7 @@ func (n *NetflowInstaller) cloneRepo(ctx context.Context, cfg *Config, output io
 		`if [ -d %[1]s/.git ]; then echo "Repository exists, pulling latest..." && cd %[1]s && git pull; else git clone https://github.com/SonarSoftwareInc/netflow-onprem.git %[1]s; fi`,
 		shellQuote(dir),
 	)
-	return sys.RunCmd(ctx, cmd, output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, cmd, output)
 }
 
 // configureEnv creates the .env file from .env.example and populates
@@ -210,7 +214,7 @@ func (n *NetflowInstaller) configureEnv(ctx context.Context, cfg *Config, output
 	envPath := dir + "/.env"
 	cmd := fmt.Sprintf("printf '%%s' %s > %s", shellQuote(env.String()), shellQuote(envPath))
 	_, _ = fmt.Fprintf(output, "  Writing %s\n", envPath)
-	return sys.RunCmd(ctx, cmd, output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, cmd, output)
 }
 
 // runInstall executes the netflow Docker-based install script.

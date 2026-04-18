@@ -36,6 +36,9 @@ type Target struct {
 	Port int
 	// Password is the SSH password when using password-based auth.
 	Password string
+	// SudoPassword is the remote sudo password used for privileged commands.
+	// When empty, STUI assumes passwordless sudo/doas or a root SSH login.
+	SudoPassword string
 	// KeyPath is the path to a private key file for key-based auth.
 	KeyPath string
 }
@@ -271,6 +274,9 @@ type PreflightResult struct {
 	// HardwareReqs holds the recommended hardware for this installer,
 	// used by the view to render per-metric pass/fail lines.
 	HardwareReqs *HardwareReqs
+	// DNS holds the result of a domain resolution check, or nil if
+	// no domain was configured for the installer.
+	DNS *DNSResult
 }
 
 // Installer is the interface that all Sonar application installers implement.
@@ -290,7 +296,9 @@ type Installer interface {
 	HardwareRequirements() HardwareReqs
 
 	// PreflightCheck verifies the system meets requirements.
-	PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error)
+	// The provided Config carries the install target and any
+	// app-specific values (e.g., domain) needed for checks.
+	PreflightCheck(ctx context.Context, cfg *Config) (*PreflightResult, error)
 
 	// Steps returns the ordered installation steps.
 	Steps() []Step

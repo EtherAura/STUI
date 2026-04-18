@@ -201,12 +201,12 @@ func TestScreenConstants(t *testing.T) {
 }
 
 // TestNewAppModelWithResume verifies that the resume constructor starts
-// on the preflight screen for the specified app.
+// on the config screen for the specified app.
 func TestNewAppModelWithResume(t *testing.T) {
 	m := NewAppModelWithResume(installer.AppCustomerPortal)
 
-	if m.Screen() != ScreenPreflight {
-		t.Errorf("screen = %d, want ScreenPreflight (%d)", m.Screen(), ScreenPreflight)
+	if m.Screen() != ScreenConfig {
+		t.Errorf("screen = %d, want ScreenConfig (%d)", m.Screen(), ScreenConfig)
 	}
 	if m.ResumeAppID() != installer.AppCustomerPortal {
 		t.Errorf("ResumeAppID() = %q, want %q", m.ResumeAppID(), installer.AppCustomerPortal)
@@ -214,7 +214,7 @@ func TestNewAppModelWithResume(t *testing.T) {
 }
 
 // TestNewAppModelWithResumeInit verifies that Init on a resumed model
-// returns a command (from preflight init, not menu init).
+// returns a command (from config init, not menu init).
 func TestNewAppModelWithResumeInit(t *testing.T) {
 	m := NewAppModelWithResume(installer.AppCustomerPortal)
 	cmd := m.Init()

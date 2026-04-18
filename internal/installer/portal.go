@@ -50,8 +50,9 @@ func (p *PortalInstaller) HardwareRequirements() HardwareReqs {
 }
 
 // PreflightCheck verifies the host meets Customer Portal requirements:
-// Ubuntu OS, git and curl available, and root access.
-func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*PreflightResult, error) {
+// Ubuntu OS, git and unzip available, root access, and domain DNS resolution.
+func (p *PortalInstaller) PreflightCheck(ctx context.Context, cfg *Config) (*PreflightResult, error) {
+	target := cfg.Target
 	target.Normalize()
 	result := &PreflightResult{Passed: true}
 	system, err := SystemForTarget(target)
@@ -113,8 +114,27 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context, target Target) (*P
 			result.Errors = append(result.Errors,
 				"remote target is not root and no sudo/doas command is available; connect as root or install sudo/doas")
 		} else {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("remote target is not root; privileged commands will use %s and require non-interactive access", result.Escalation.Name))
+			msg := fmt.Sprintf("remote target is not root; privileged commands will use %s", result.Escalation.Name)
+			if result.Escalation.Name == "sudo" && target.SudoPassword == "" {
+				msg += " and may require a sudo password"
+			}
+			result.Warnings = append(result.Warnings, msg)
+		}
+	}
+
+	// Verify domain DNS when a domain has been configured. Certbot
+	// needs the domain to resolve to a public IP for HTTP-01 challenges.
+	if cfg.Domain != "" {
+		dns := ResolveDomain(cfg.Domain)
+		// Check port reachability on public IPs when DNS resolves.
+		if dns.OK() {
+			dns.CheckPorts(80, 443)
+		}
+		result.DNS = dns
+		result.Warnings = append(result.Warnings, dns.Warnings...)
+		if !dns.OK() {
+			result.Passed = false
+			result.Errors = append(result.Errors, dns.Errors...)
 		}
 	}
 
@@ -177,36 +197,81 @@ func (p *PortalInstaller) cloneRepo(ctx context.Context, cfg *Config, output io.
 		`if [ -d %[1]s/.git ]; then echo "Repository exists, pulling latest..." && cd %[1]s && git pull; else git clone https://github.com/SonarSoftwareInc/customer_portal.git %[1]s; fi`,
 		shellQuote(dir),
 	)
-	return sys.RunCmd(ctx, cmd, output)
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, cmd, output)
 }
 
-// configureEnv creates the .env file with user-supplied portal values.
+// configureEnv writes the .env file directly to the target host so
+// that the install commands can source it. This bypasses install.sh's
+// fragile interactive prompts entirely.
 func (p *PortalInstaller) configureEnv(ctx context.Context, cfg *Config, output io.Writer) error {
 	sys, err := SystemForTarget(cfg.Target)
 	if err != nil {
 		return fmt.Errorf("resolving target: %w", err)
 	}
 	dir := repoDir(cfg, "customer_portal")
+	trimmedURL := strings.TrimRight(cfg.SonarURL, "/")
 
-	var env strings.Builder
-	fmt.Fprintf(&env, "SONAR_URL=%s\n", cfg.SonarURL)
-	fmt.Fprintf(&env, "API_USERNAME=%s\n", cfg.APIUsername)
-	fmt.Fprintf(&env, "API_PASSWORD=%s\n", cfg.APIPassword)
-	fmt.Fprintf(&env, "PORTAL_DOMAIN=%s\n", cfg.Domain)
-	fmt.Fprintf(&env, "ADMIN_EMAIL=%s\n", cfg.Email)
-
-	envPath := dir + "/.env"
-	cmd := fmt.Sprintf("printf '%%s' %s > %s", shellQuote(env.String()), shellQuote(envPath))
-	_, _ = fmt.Fprintf(output, "  Writing %s\n", envPath)
-	return sys.RunCmd(ctx, cmd, output)
+	// Stop any running containers before writing a fresh .env.
+	// The APP_KEY is generated on the target so every install gets a
+	// unique key, matching install.sh behaviour. Each config value is
+	// shell-quoted to prevent injection through user-supplied inputs.
+	cmd := fmt.Sprintf(
+		"cd %s && "+
+			"(docker compose stop 2>/dev/null || true) && "+
+			"APP_KEY=\"base64:$(head -c32 /dev/urandom | base64)\" && { "+
+			"echo \"APP_KEY=$APP_KEY\"; "+
+			"echo %s; "+
+			"echo %s; "+
+			"echo %s; "+
+			"echo %s; "+
+			"echo %s; "+
+			"} > .env",
+		shellQuote(dir),
+		shellQuote("NGINX_HOST="+cfg.Domain),
+		shellQuote("API_USERNAME="+cfg.APIUsername),
+		shellQuote("API_PASSWORD="+cfg.APIPassword),
+		shellQuote("SONAR_URL="+trimmedURL),
+		shellQuote("EMAIL_ADDRESS="+cfg.Email),
+	)
+	_, _ = io.WriteString(output, "  Writing .env to target...\n")
+	return RunPrivilegedCmd(ctx, cfg.Target, sys, cmd, output)
 }
 
 // runInstall executes the portal's Docker-based install script.
+// configureEnv has already written .env, so install.sh will find it
+// and prompt "Set it up again? [y/N]" via read -n 1. That prompt
+// reads exactly one byte without consuming the trailing newline, so
+// we must NOT place a \n between the "y" answer and the subsequent
+// values — otherwise the stale \n gets consumed by the next read as
+// an empty line. After accepting "y", install.sh runs docker compose
+// stop (freeing ports 80/443), so the port-in-use prompt should not
+// appear. The remaining read -ep prompts each consume one \n-delimited
+// line: domain, username, password, URL, email.
 func (p *PortalInstaller) runInstall(ctx context.Context, cfg *Config, output io.Writer) error {
 	sys, err := SystemForTarget(cfg.Target)
 	if err != nil {
 		return fmt.Errorf("resolving target: %w", err)
 	}
 	dir := repoDir(cfg, "customer_portal")
-	return RunPrivilegedCmd(ctx, cfg.Target, sys, fmt.Sprintf("cd %s && chmod +x install.sh && ./install.sh", shellQuote(dir)), output)
+
+	// Stdin answers for install.sh:
+	//   "y"        — .env exists, set up again? (read -n 1, consumes 1 byte)
+	//   domain\n   — portal domain           (read -ep, consumes line)
+	//   user\n     — API username             (read -ep, consumes line)
+	//   pass\n     — API password             (read -esp, consumes line)
+	//   url\n      — Sonar instance URL       (read -ep, consumes line)
+	//   email\n    — email address            (read -ep, consumes line)
+	//
+	// IMPORTANT: No \n after "y". read -n 1 consumes the single 'y'
+	// byte and returns immediately. The next read -ep then sees the
+	// domain value as its first input line.
+	answers := "y" +
+		cfg.Domain + "\n" +
+		cfg.APIUsername + "\n" +
+		cfg.APIPassword + "\n" +
+		cfg.SonarURL + "\n" +
+		cfg.Email + "\n"
+
+	cmd := fmt.Sprintf("cd %s && chmod +x install.sh && ./install.sh", shellQuote(dir))
+	return RunPrivilegedCmdInput(ctx, cfg.Target, sys, cmd, answers, output)
 }
