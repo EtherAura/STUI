@@ -18,6 +18,30 @@ VERSION_ID="24.04"
 PRETTY_NAME="Ubuntu 24.04 LTS"`), nil
 }
 
+// ubuntu2204Reader returns fake os-release content for Ubuntu 22.04,
+// one of the two versions supported by the Customer Portal.
+func ubuntu2204Reader(_ string) ([]byte, error) {
+	return []byte(`ID=ubuntu
+VERSION_ID="22.04"
+PRETTY_NAME="Ubuntu 22.04 LTS"`), nil
+}
+
+// ubuntu1804Reader returns fake os-release content for Ubuntu 18.04,
+// one of the two versions supported by the Customer Portal.
+func ubuntu1804Reader(_ string) ([]byte, error) {
+	return []byte(`ID=ubuntu
+VERSION_ID="18.04"
+PRETTY_NAME="Ubuntu 18.04 LTS"`), nil
+}
+
+// ubuntu1904Reader returns fake os-release content for Ubuntu 19.04,
+// an unsupported version where Docker is not available.
+func ubuntu1904Reader(_ string) ([]byte, error) {
+	return []byte(`ID=ubuntu
+VERSION_ID="19.04"
+PRETTY_NAME="Ubuntu 19.04"`), nil
+}
+
 // debianReader returns fake os-release content for Debian 12.
 func debianReader(_ string) ([]byte, error) {
 	return []byte(`ID=debian
@@ -211,6 +235,75 @@ func TestPreflightOSDecisions(t *testing.T) {
 
 			if accepted != tt.wantPass {
 				t.Errorf("OS %q accepted=%v, want %v", osInfo.ID, accepted, tt.wantPass)
+			}
+		})
+	}
+}
+
+// TestPortalVersionDecisions tests the Ubuntu version matching logic
+// specific to the Customer Portal. Only Ubuntu 18.04 and 22.04 are
+// supported per the upstream README:
+// https://github.com/SonarSoftwareInc/customer_portal#quick-start
+func TestPortalVersionDecisions(t *testing.T) {
+	supportedVersions := map[string]bool{
+		"18.04": true,
+		"22.04": true,
+	}
+
+	tests := []struct {
+		name     string
+		readFile ReadFileFunc
+		wantPass bool
+		wantMsg  string
+	}{
+		{
+			name:     "ubuntu 22.04 accepted",
+			readFile: ubuntu2204Reader,
+			wantPass: true,
+		},
+		{
+			name:     "ubuntu 18.04 accepted",
+			readFile: ubuntu1804Reader,
+			wantPass: true,
+		},
+		{
+			name:     "ubuntu 24.04 rejected",
+			readFile: ubuntuReader,
+			wantPass: false,
+			wantMsg:  "unsupported Ubuntu version",
+		},
+		{
+			name:     "ubuntu 19.04 rejected",
+			readFile: ubuntu1904Reader,
+			wantPass: false,
+			wantMsg:  "unsupported Ubuntu version",
+		},
+		{
+			name:     "non-ubuntu gets OS warning instead",
+			readFile: debianReader,
+			wantPass: true, // non-Ubuntu is a warning, not a version error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			osInfo, err := DetectOSWith(tt.readFile)
+			if err != nil {
+				t.Fatalf("DetectOSWith error: %v", err)
+			}
+
+			passed := true
+			errMsg := ""
+			if osInfo.ID == "ubuntu" && !supportedVersions[osInfo.VersionID] {
+				passed = false
+				errMsg = fmt.Sprintf("unsupported Ubuntu version: %s", osInfo.VersionID)
+			}
+
+			if passed != tt.wantPass {
+				t.Errorf("passed=%v, want %v (version=%s)", passed, tt.wantPass, osInfo.VersionID)
+			}
+			if tt.wantMsg != "" && !strings.Contains(errMsg, tt.wantMsg) {
+				t.Errorf("errMsg=%q, want to contain %q", errMsg, tt.wantMsg)
 			}
 		})
 	}

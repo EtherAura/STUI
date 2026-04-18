@@ -28,24 +28,26 @@ func (p *PortalInstaller) Description() string {
 }
 
 // Requirements returns the system requirements for the Customer Portal.
+// Source: https://github.com/SonarSoftwareInc/customer_portal#quick-start
 func (p *PortalInstaller) Requirements() []string {
 	return []string{
-		"OS: Ubuntu (recommended)",
+		"OS: Ubuntu 18.04 or 22.04 x64 (Debian-based; other versions unsupported)",
 		"Commands: git, unzip (Docker installed by install.sh)",
 		"Privileges: root / sudo",
-		"CPU: 2+ cores",
+		"CPU: 2+ vCPUs",
 		"RAM: 2 GB+",
-		"Disk: 10 GB+ free",
+		"Disk: 25 GB+ free",
 	}
 }
 
 // HardwareRequirements returns the Sonar-recommended minimums for
-// the Customer Portal: 2 cores, 2 GB RAM, 10 GB disk.
+// the Customer Portal: 2 vCPUs, 2 GB RAM, 25 GB disk.
+// Source: https://github.com/SonarSoftwareInc/customer_portal#quick-start
 func (p *PortalInstaller) HardwareRequirements() HardwareReqs {
 	return HardwareReqs{
 		MinCPUCores: 2,
 		MinRAMMB:    2048,
-		MinDiskGB:   10,
+		MinDiskGB:   25,
 	}
 }
 
@@ -68,9 +70,17 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context, cfg *Config) (*Pre
 	result.Version = osInfo.VersionID
 
 	// Check supported OS — warn but do not block on non-Ubuntu.
+	// Source: https://github.com/SonarSoftwareInc/customer_portal#quick-start
 	if osInfo.ID != "ubuntu" {
 		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu only)", osInfo.ID))
+			fmt.Sprintf("unsupported OS: %s (officially supports Ubuntu 18.04/22.04 only)", osInfo.ID))
+	} else if osInfo.VersionID != "18.04" && osInfo.VersionID != "22.04" {
+		// The upstream install.sh uses lsb_release -cs for the Docker APT
+		// repository. Docker is unsupported on Ubuntu 19.x and blocking issues
+		// have been encountered on Ubuntu 24.04.
+		result.Passed = false
+		result.Errors = append(result.Errors,
+			fmt.Sprintf("unsupported Ubuntu version: %s (only 18.04 and 22.04 are supported)", osInfo.VersionID))
 	}
 
 	// Check commands needed before the installer can bootstrap the host.
@@ -91,7 +101,7 @@ func (p *PortalInstaller) PreflightCheck(ctx context.Context, cfg *Config) (*Pre
 	reqs := &HardwareReqs{
 		MinCPUCores: 2,
 		MinRAMMB:    2048,
-		MinDiskGB:   10,
+		MinDiskGB:   25,
 	}
 	hw, hwErr := DetectHardwareOn(system)
 	if hwErr == nil {
